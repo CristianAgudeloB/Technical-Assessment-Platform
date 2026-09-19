@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+overrides:
+  deepmerge-ts: 8.0.2
+  dompurify: 3.4.15
+  mysql2: 3.24.4
+
+# Prisma downloads its platform-specific engines during installation.
+onlyBuiltDependencies:
+  - '@prisma/engines'
+  - prisma
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true

@@ -1,0 +1,35 @@
+import { Module } from '@nestjs/common';
+import { ExecutionModule } from '../execution/execution.module';
+import { AssessmentAttemptModule } from '../assessment-attempt/assessment-attempt.module';
+import { EvaluationModule } from '../evaluation/evaluation.module';
+import { QuestionModule } from '../question/question.module';
+import { CreateSubmissionUseCase } from './application/create-submission.use-case';
+import { ExecuteSubmissionUseCase } from './application/execute-submission.use-case';
+import { GetSubmissionResultsUseCase } from './application/get-submission-results.use-case';
+import { SUBMISSION_REPOSITORY } from './domain/submission.repository';
+import { TEST_RESULT_REPOSITORY } from './domain/test-result.repository';
+import { PrismaSubmissionRepository } from './infrastructure/prisma-submission.repository';
+import { PrismaTestResultRepository } from './infrastructure/prisma-test-result.repository';
+import { SubmissionController } from './presentation/submission.controller';
+
+@Module({
+  imports: [QuestionModule, ExecutionModule, EvaluationModule, AssessmentAttemptModule],
+  controllers: [SubmissionController],
+  providers: [
+    CreateSubmissionUseCase,
+    ExecuteSubmissionUseCase,
+    GetSubmissionResultsUseCase,
+    PrismaSubmissionRepository,
+    PrismaTestResultRepository,
+    {
+      provide: SUBMISSION_REPOSITORY,
+      useExisting: PrismaSubmissionRepository,
+    },
+    {
+      provide: TEST_RESULT_REPOSITORY,
+      useExisting: PrismaTestResultRepository,
+    },
+  ],
+  exports: [SUBMISSION_REPOSITORY],
+})
+export class SubmissionModule {}

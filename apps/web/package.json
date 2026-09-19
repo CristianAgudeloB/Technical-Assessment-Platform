@@ -1,0 +1,27 @@
+{
+  "name": "@kata/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@kata/shared-types": "workspace:*",
+    "@monaco-editor/react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "monaco-editor": "^0.56.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^7.18.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.0"
+  }
+}

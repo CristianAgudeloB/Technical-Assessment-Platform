@@ -1,0 +1,23 @@
+{
+  "name": "technical-assessment-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @kata/api --filter @kata/web dev",
+    "dev:api": "pnpm --filter @kata/api dev",
+    "dev:web": "pnpm --filter @kata/web dev",
+    "build": "pnpm --filter @kata/shared-types build && pnpm --filter @kata/api build && pnpm --filter @kata/web build",
+    "typecheck": "pnpm --filter @kata/shared-types typecheck && pnpm --filter @kata/api typecheck && pnpm --filter @kata/web typecheck",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:generate": "pnpm --filter @kata/api prisma generate",
+    "db:migrate": "pnpm --filter @kata/api prisma migrate deploy",
+    "db:migrate:dev": "pnpm --filter @kata/api prisma migrate dev",
+    "db:seed": "pnpm --filter @kata/api db:seed",
+    "verify:api": "bash scripts/verify-assessment-question-api.sh",
+    "verify:judge0": "pnpm --filter @kata/api exec tsx ../../scripts/verify-judge0-adapter.ts",
+    "verify:execution": "bash scripts/verify-first-execution-flow.sh"
+  }
+}

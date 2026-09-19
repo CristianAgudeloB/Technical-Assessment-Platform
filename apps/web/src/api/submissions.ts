@@ -1,0 +1,70 @@
+import { getJson, postJson } from './http';
+
+export type ProgrammingLanguage = 'JAVA' | 'JAVASCRIPT' | 'PYTHON' | 'TYPESCRIPT' | 'COBOL';
+
+export type CreateSubmissionRequest = {
+  assessmentAttemptId: string;
+  questionId: string;
+  language: ProgrammingLanguage;
+  sourceCode: string;
+};
+
+export type CreateSubmissionResponse = {
+  id: string;
+};
+
+export type PersistedTestResult = {
+  id: string;
+  testCaseId: string;
+  position: number;
+  isHidden: boolean;
+  status:
+    | 'ACCEPTED'
+    | 'WRONG_ANSWER'
+    | 'COMPILATION_ERROR'
+    | 'RUNTIME_ERROR'
+    | 'TIME_LIMIT_EXCEEDED'
+    | 'MEMORY_LIMIT_EXCEEDED'
+    | 'INTERNAL_ERROR';
+  passed: boolean;
+  stdout: string | null;
+  stderr: string | null;
+  compileOutput: string | null;
+  executionTimeMs: number | null;
+  memoryKb: number | null;
+};
+
+export type SubmissionExecutionSummary = {
+  submissionId: string;
+  questionId: string;
+  totalTests: number;
+  passedTests: number;
+  failedTests: number;
+  score: number;
+  testResults: PersistedTestResult[];
+};
+
+export type SubmissionResults = SubmissionExecutionSummary & {
+  assessmentId: string;
+  question: {
+    id: string;
+    title: string;
+    position: number;
+  };
+  language: ProgrammingLanguage;
+  questionsCorrect: number;
+  questionsIncorrect: number;
+  timeConsumedMs: number;
+};
+
+export function createSubmission(request: CreateSubmissionRequest) {
+  return postJson<CreateSubmissionResponse>('/submissions', request);
+}
+
+export function executeSubmission(submissionId: string) {
+  return postJson<SubmissionExecutionSummary>(`/submissions/${submissionId}/execute`, {});
+}
+
+export function getSubmissionResults(submissionId: string, signal?: AbortSignal) {
+  return getJson<SubmissionResults>(`/submissions/${submissionId}/results`, signal);
+}

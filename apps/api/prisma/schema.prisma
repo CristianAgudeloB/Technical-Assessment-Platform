@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AssessmentResultStatus {
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+enum AssessmentAttemptStatus {
+  ACTIVE
+  EXPIRED
+}
+
+enum ProgrammingLanguage {
+  JAVA
+  JAVASCRIPT
+  PYTHON
+  TYPESCRIPT
+  COBOL
+}
+
+enum SubmissionStatus {
+  DRAFT
+  PENDING
+  EVALUATED
+}
+
+enum TestResultStatus {
+  PENDING
+  ACCEPTED
+  WRONG_ANSWER
+  COMPILATION_ERROR
+  RUNTIME_ERROR
+  TIME_LIMIT_EXCEEDED
+  MEMORY_LIMIT_EXCEEDED
+  INTERNAL_ERROR
+}
+
+model Assessment {
+  id              String             @id @default(cuid())
+  slug            String             @unique @db.VarChar(100)
+  name            String             @db.VarChar(160)
+  description     String             @db.Text
+  durationMinutes Int
+  status          AssessmentStatus   @default(DRAFT)
+  publishedAt     DateTime?
+  questions       Question[]
+  attempts        AssessmentAttempt[]
+  results         AssessmentResult[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([status])
+}
+
+model Question {
+  id               String                    @id @default(cuid())
+  assessmentId     String
+  slug             String                    @db.VarChar(100)
+  title            String                    @db.VarChar(160)
+  description      String                    @db.Text
+  position         Int
+  score            Decimal                   @default(10) @db.Decimal(5, 2)
+  assessment       Assessment                @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  allowedLanguages QuestionAllowedLanguage[]
+  testCases        TestCase[]
+  submissions      Submission[]
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@unique([assessmentId, slug])
+  @@unique([assessmentId, position])
+  @@index([assessmentId])
+}
+
+model QuestionAllowedLanguage {
+  questionId String
+  language   ProgrammingLanguage
+  question   Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, language])
+}
+
+model TestCase {
+  id             String       @id @default(cuid())
+  questionId     String
+  position       Int
+  input          String       @db.Text
+  expectedOutput String       @db.Text
+  isHidden       Boolean      @default(true)
+  question       Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  results        TestResult[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([questionId, position])
+  @@index([questionId])
+}
+
+model Candidate {
+  id                String             @id @default(cuid())
+  identification    String             @unique @db.VarChar(80)
+  displayName       String             @db.VarChar(160)
+  email             String?            @unique @db.VarChar(255)
+  assessmentResults AssessmentResult[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model AssessmentResult {
+  id                  String                 @id @default(cuid())
+  assessmentId        String
+  candidateId         String
+  attemptNumber       Int                    @default(1)
+  status              AssessmentResultStatus @default(IN_PROGRESS)
+  score               Decimal?               @db.Decimal(5, 2)
+  questionsCorrect    Int                    @default(0)
+  questionsIncorrect  Int                    @default(0)
+  timeConsumedSeconds Int?
+  startedAt           DateTime               @default(now())
+  completedAt         DateTime?
+  assessment          Assessment             @relation(fields: [assessmentId], references: [id], onDelete: Restrict)
+  candidate           Candidate              @relation(fields: [candidateId], references: [id], onDelete: Restrict)
+  submissions         Submission[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([assessmentId])
+  @@index([candidateId])
+  @@unique([assessmentId, candidateId, attemptNumber])
+  @@index([candidateId, assessmentId])
+}
+
+model AssessmentAttempt {
+  id                  String                  @id @default(cuid())
+  assessmentId        String
+  status              AssessmentAttemptStatus @default(ACTIVE)
+  submissionCount     Int                     @default(0)
+  score               Decimal?                @db.Decimal(5, 2)
+  questionsCorrect    Int                     @default(0)
+  questionsIncorrect  Int                     @default(0)
+  completedQuestions  Int                     @default(0)
+  timeConsumedSeconds Int?
+  startedAt           DateTime                @default(now())
+  expiresAt           DateTime
+  expiredAt           DateTime?
+  assessment          Assessment               @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  submissions         Submission[]
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([assessmentId])
+  @@index([status, expiresAt])
+}
+
+model Submission {
+  id                 String            @id @default(cuid())
+  assessmentResultId String?
+  assessmentAttemptId String?
+  questionId         String
+  language           ProgrammingLanguage
+  sourceCode         String            @db.Text
+  status             SubmissionStatus  @default(DRAFT)
+  score              Decimal?          @db.Decimal(5, 2)
+  submittedAt        DateTime?
+  assessmentResult   AssessmentResult? @relation(fields: [assessmentResultId], references: [id], onDelete: SetNull)
+  assessmentAttempt  AssessmentAttempt? @relation(fields: [assessmentAttemptId], references: [id], onDelete: SetNull)
+  question           Question          @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  testResults        TestResult[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([assessmentResultId])
+  @@index([assessmentAttemptId])
+  @@index([questionId])
+}
+
+model TestResult {
+  id              String           @id @default(cuid())
+  submissionId    String
+  testCaseId      String
+  status          TestResultStatus @default(PENDING)
+  stdout          String?          @db.Text
+  stderr          String?          @db.Text
+  compileOutput   String?          @db.Text
+  executionTimeMs Int?
+  memoryKb        Int?
+  submission      Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  testCase        TestCase         @relation(fields: [testCaseId], references: [id], onDelete: Restrict)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([submissionId, testCaseId])
+  @@index([testCaseId])
+}
