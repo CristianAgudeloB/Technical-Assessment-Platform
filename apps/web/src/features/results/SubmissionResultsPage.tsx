@@ -42,6 +42,25 @@ function compilationSummary(results: SubmissionResults) {
     : 'Compilación exitosa';
 }
 
+function qualityStatusLabel(status: NonNullable<SubmissionResults['quality']>['status']) {
+  const labels = {
+    PENDING: 'Analizando',
+    COMPLETED: 'Análisis completado',
+    SKIPPED: 'No disponible para este lenguaje',
+    FAILED: 'Análisis no disponible',
+  } as const;
+  return labels[status];
+}
+
+function qualityTypeLabel(type: NonNullable<SubmissionResults['quality']>['issues'][number]['type']) {
+  const labels = {
+    BUG: 'Posible error',
+    CODE_SMELL: 'Code smell',
+    VULNERABILITY: 'Vulnerabilidad',
+  } as const;
+  return labels[type];
+}
+
 export function SubmissionResultsPage() {
   const { assessmentId, submissionId } = useParams();
   const [searchParams] = useSearchParams();
@@ -49,6 +68,7 @@ export function SubmissionResultsPage() {
   const [results, setResults] = useState<SubmissionResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [qualityRefresh, setQualityRefresh] = useState(0);
 
   useEffect(() => {
     if (!assessmentId || !submissionId) {
@@ -58,8 +78,13 @@ export function SubmissionResultsPage() {
     }
 
     const controller = new AbortController();
-    setLoading(true);
+    // Keep the functional result on screen while the optional report refreshes.
+    if (qualityRefresh === 0) {
+      setLoading(true);
+    }
     setError(null);
+
+    let qualityRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
     getSubmissionResults(submissionId, controller.signal)
       .then((loadedResults) => {
@@ -68,6 +93,9 @@ export function SubmissionResultsPage() {
         }
 
         setResults(loadedResults);
+        if (loadedResults.quality?.status === 'PENDING') {
+          qualityRefreshTimer = setTimeout(() => setQualityRefresh((current) => current + 1), 2_000);
+        }
       })
       .catch((requestError: unknown) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') {
@@ -82,8 +110,11 @@ export function SubmissionResultsPage() {
         }
       });
 
-    return () => controller.abort();
-  }, [assessmentId, submissionId]);
+    return () => {
+      controller.abort();
+      if (qualityRefreshTimer) clearTimeout(qualityRefreshTimer);
+    };
+  }, [assessmentId, qualityRefresh, submissionId]);
 
   if (loading) {
     return (
@@ -170,6 +201,48 @@ export function SubmissionResultsPage() {
           })}
         </ol>
       </section>
+
+      {results.quality ? (
+        <section className="quality-result-section" aria-labelledby="quality-results-title">
+          <div className="quality-results-heading">
+            <div>
+              <p className="section-kicker">SonarQube Community Build</p>
+              <h2 id="quality-results-title">Calidad del código</h2>
+            </div>
+            <span className={`quality-status ${results.quality.status.toLowerCase()}`}>
+              {qualityStatusLabel(results.quality.status)}
+            </span>
+          </div>
+
+          {results.quality.status === 'COMPLETED' ? (
+            <>
+              <dl className="quality-facts">
+                <div><dt>Hallazgos</dt><dd>{results.quality.totalIssues}</dd></div>
+                <div><dt>Posibles errores</dt><dd>{results.quality.bugs}</dd></div>
+                <div><dt>Code smells</dt><dd>{results.quality.codeSmells}</dd></div>
+                <div><dt>Vulnerabilidades</dt><dd>{results.quality.vulnerabilities}</dd></div>
+              </dl>
+              {results.quality.issues.length > 0 ? (
+                <ul className="quality-issue-list">
+                  {results.quality.issues.map((issue, index) => (
+                    <li key={`${issue.rule}-${issue.line ?? 'global'}-${index}`}>
+                      <span className={`quality-issue-type ${issue.type.toLowerCase()}`}>
+                        {qualityTypeLabel(issue.type)}
+                      </span>
+                      <div>
+                        <strong>{issue.message}</strong>
+                        <small>{issue.rule}{issue.line === null ? '' : ` · línea ${issue.line}`} · {issue.severity}</small>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="quality-empty">No se detectaron hallazgos en este envío.</p>}
+            </>
+          ) : (
+            <p className="quality-message">{results.quality.message ?? 'El análisis de calidad se procesará sin afectar tu puntaje funcional.'}</p>
+          )}
+        </section>
+      ) : null}
     </section>
   );
 }

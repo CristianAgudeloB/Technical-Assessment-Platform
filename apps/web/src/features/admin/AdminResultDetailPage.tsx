@@ -20,6 +20,25 @@ const languageLabel: Record<string, string> = {
   COBOL: 'COBOL',
 };
 
+function qualityStatusLabel(status: SubmissionQuality['status']) {
+  const labels = {
+    PENDING: 'Analizando',
+    COMPLETED: 'Análisis completado',
+    SKIPPED: 'No disponible para este lenguaje',
+    FAILED: 'Análisis no disponible',
+  } as const;
+  return labels[status];
+}
+
+function qualityTypeLabel(type: SubmissionQuality['issues'][number]['type']) {
+  const labels = {
+    BUG: 'Posible error',
+    CODE_SMELL: 'Code smell',
+    VULNERABILITY: 'Vulnerabilidad',
+  } as const;
+  return labels[type];
+}
+
 export function AdminResultDetailPage() {
   const { attemptId } = useParams();
   const [detail, setDetail] = useState<AdminAssessmentResultDetail | null>(null);
@@ -94,6 +113,7 @@ export function AdminResultDetailPage() {
                       <span className={hasCompilationError ? 'admin-compilation-state error' : 'admin-compilation-state'}>{hasCompilationError ? 'Error de compilación' : 'Compilación exitosa'}</span>
                       <span>{passedTests}/{submission.tests.length} casos aprobados{failedTests > 0 ? ` · ${failedTests} fallidos` : ''}</span>
                     </div>
+                    <QualityReport quality={submission.quality} questionTitle={question.title} />
                     <pre aria-label={`Código enviado para ${question.title}`}><code>{submission.sourceCode}</code></pre>
                     <div className="admin-test-cases" aria-label="Casos de prueba">
                       {submission.tests.map((test) => (
@@ -120,6 +140,46 @@ export function AdminResultDetailPage() {
         </div>
       </section>
     </section>
+  );
+}
+
+type SubmissionQuality = NonNullable<NonNullable<AdminAssessmentResultDetail['questions'][number]['submission']>['quality']>;
+
+function QualityReport({ quality, questionTitle }: { quality: SubmissionQuality | null; questionTitle: string }) {
+  if (!quality) return null;
+
+  const isCompleted = quality.status === 'COMPLETED';
+  return (
+    <details className="admin-quality-report">
+      <summary>
+        <span>Calidad del código</span>
+        <strong className={quality.status.toLowerCase()}>{qualityStatusLabel(quality.status)}</strong>
+        {isCompleted && <small>{quality.totalIssues} {quality.totalIssues === 1 ? 'hallazgo' : 'hallazgos'}</small>}
+        <span className="admin-test-case-action">Ver resultados</span>
+      </summary>
+      <div className="admin-quality-report-body">
+        {isCompleted ? (
+          <>
+            <dl className="admin-quality-facts">
+              <div><dt>Hallazgos</dt><dd>{quality.totalIssues}</dd></div>
+              <div><dt>Posibles errores</dt><dd>{quality.bugs}</dd></div>
+              <div><dt>Code smells</dt><dd>{quality.codeSmells}</dd></div>
+              <div><dt>Vulnerabilidades</dt><dd>{quality.vulnerabilities}</dd></div>
+            </dl>
+            {quality.issues.length > 0 ? (
+              <ul className="admin-quality-issues" aria-label={`Hallazgos de calidad para ${questionTitle}`}>
+                {quality.issues.map((issue, index) => (
+                  <li key={`${issue.rule}-${issue.line ?? 'global'}-${index}`}>
+                    <span className={`quality-issue-type ${issue.type.toLowerCase()}`}>{qualityTypeLabel(issue.type)}</span>
+                    <div><strong>{issue.message}</strong><small>{issue.rule}{issue.line === null ? '' : ` · línea ${issue.line}`} · {issue.severity}</small></div>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="admin-quality-empty">No se detectaron hallazgos en este envío.</p>}
+          </>
+        ) : <p className="admin-quality-empty">{quality.message ?? 'El análisis se procesa sin afectar el puntaje funcional.'}</p>}
+      </div>
+    </details>
   );
 }
 

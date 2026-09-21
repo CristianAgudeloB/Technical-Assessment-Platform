@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AssessmentAttemptModule } from '../assessment-attempt/assessment-attempt.module';
+import { CodeQualityModule } from '../code-quality/code-quality.module';
 import { QuestionModule } from '../question/question.module';
 import { SubmissionModule } from '../submission/submission.module';
 import { GetAssessmentResultUseCase } from './application/get-assessment-result.use-case';
@@ -9,7 +10,7 @@ import { AdminAssessmentResultController } from './presentation/admin-assessment
 import { AssessmentResultController } from './presentation/assessment-result.controller';
 
 @Module({
-  imports: [AssessmentAttemptModule, QuestionModule, SubmissionModule],
+  imports: [AssessmentAttemptModule, CodeQualityModule, QuestionModule, SubmissionModule],
   controllers: [AssessmentResultController, AdminAssessmentResultController],
   providers: [GetAssessmentResultUseCase, GetAdminAssessmentResultDetailUseCase, ListAdminAssessmentResultsUseCase],
 })

@@ -7,6 +7,10 @@ import {
   ASSESSMENT_ATTEMPT_REPOSITORY,
   AssessmentAttemptRepository,
 } from '../../assessment-attempt/domain/assessment-attempt.repository';
+import {
+  SUBMISSION_QUALITY_REPORT_REPOSITORY,
+  SubmissionQualityReportRepository,
+} from '../../code-quality/domain/submission-quality-report.repository';
 
 export type SubmissionResultsResponse = {
   submissionId: string;
@@ -24,6 +28,22 @@ export type SubmissionResultsResponse = {
   questionsCorrect: number;
   questionsIncorrect: number;
   timeConsumedMs: number;
+  quality: {
+    status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'FAILED';
+    qualityGateStatus: string | null;
+    totalIssues: number;
+    bugs: number;
+    codeSmells: number;
+    vulnerabilities: number;
+    issues: Array<{
+      type: 'BUG' | 'CODE_SMELL' | 'VULNERABILITY';
+      severity: string;
+      message: string;
+      rule: string;
+      line: number | null;
+    }>;
+    message: string | null;
+  } | null;
   testResults: Array<{
     id: string;
     testCaseId: string;
@@ -51,6 +71,8 @@ export class GetSubmissionResultsUseCase {
     private readonly testResultRepository: TestResultRepository,
     @Inject(ASSESSMENT_ATTEMPT_REPOSITORY)
     private readonly attemptRepository: AssessmentAttemptRepository,
+    @Inject(SUBMISSION_QUALITY_REPORT_REPOSITORY)
+    private readonly qualityReports: SubmissionQualityReportRepository,
   ) {}
 
   async execute(submissionId: string, userId: string): Promise<SubmissionResultsResponse> {
@@ -79,7 +101,10 @@ export class GetSubmissionResultsUseCase {
       throw new EntityNotFoundError('Question', submission.questionId);
     }
 
-    const storedResults = await this.testResultRepository.findBySubmissionId(submission.id);
+    const [storedResults, qualityReport] = await Promise.all([
+      this.testResultRepository.findBySubmissionId(submission.id),
+      this.qualityReports.findBySubmissionId(submission.id),
+    ]);
     const testCaseById = new Map(question.testCases.map((testCase) => [testCase.id, testCase]));
     const testResults = storedResults.map((result) => {
       const testCase = testCaseById.get(result.testCaseId);
@@ -121,6 +146,18 @@ export class GetSubmissionResultsUseCase {
         (total, result) => total + (result.executionTimeMs ?? 0),
         0,
       ),
+      quality: qualityReport
+        ? {
+            status: qualityReport.status,
+            qualityGateStatus: qualityReport.qualityGateStatus,
+            totalIssues: qualityReport.totalIssues,
+            bugs: qualityReport.bugs,
+            codeSmells: qualityReport.codeSmells,
+            vulnerabilities: qualityReport.vulnerabilities,
+            issues: qualityReport.issues,
+            message: qualityReport.errorMessage,
+          }
+        : null,
       testResults,
     };
   }

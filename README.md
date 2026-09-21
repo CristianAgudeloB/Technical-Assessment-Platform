@@ -1,12 +1,41 @@
 # Technical Assessment Platform
 
-Plataforma de evaluaciones técnicas construida como modular monolith: React en `apps/web`, NestJS en `apps/api`, PostgreSQL/Prisma y contratos mínimos en `packages/shared-types`.
+Plataforma web para crear, asignar y resolver evaluaciones técnicas de programación. Está construida como un **monolito modular** con React, NestJS, PostgreSQL/Prisma, Judge0 y SonarQube Community Build.
+
+## Capacidades
+
+- Administración de assessments, ejercicios, lenguajes permitidos y casos de prueba.
+- Registro e inicio de sesión con roles `ADMIN` y `CANDIDATE`.
+- Asignación de retos a candidatos con ventana de disponibilidad.
+- Intentos temporizados validados en el servidor.
+- Editor Monaco, ejecución de prueba y envío definitivo de soluciones.
+- Evaluación determinística en Judge0 con casos visibles y ocultos.
+- Puntajes por ejercicio y resultado acumulado por assessment.
+- Consulta administrativa de código, resultados de pruebas y reportes de calidad.
+- Análisis informativo de calidad con SonarQube: bugs potenciales, *code smells* y vulnerabilidades. No altera el puntaje funcional.
+
+## Arquitectura
+
+```text
+React + Monaco
+      │ HTTP / JWT
+      ▼
+NestJS modular monolith
+ ├── Assessments / Questions / Assignments
+ ├── Attempts / Submissions / Evaluation
+ ├── ExecutionPort → Judge0
+ └── CodeQualityPort → worker aislado → SonarQube
+      │
+PostgreSQL + Prisma
+```
+
+El backend no ejecuta código de candidatos. Judge0 gestiona la compilación y ejecución en sandbox; SonarScanner corre en un worker Docker aislado que solo analiza estáticamente el código fuente.
 
 ## Requisitos
 
 - Node.js 22+
 - pnpm 11+
-- Docker con Docker Compose (solo para PostgreSQL)
+- Docker Desktop con Docker Compose
 
 ## Inicio local
 
@@ -14,94 +43,75 @@ Plataforma de evaluaciones técnicas construida como modular monolith: React en 
 cp .env.example .env
 pnpm install
 pnpm db:up
-pnpm db:migrate
 pnpm db:generate
+pnpm db:migrate
 pnpm db:seed
+pnpm quality:up
 pnpm dev
 ```
 
-- Web: http://localhost:5173
-- API: http://localhost:3000/health
-- PostgreSQL: localhost:5432
+Servicios locales:
 
-El seed crea tres assessments publicados, seis ejercicios realistas de programación, Java, JavaScript y Python, 18 casos de prueba (incluyendo casos ocultos) y el usuario administrador local. La aplicación usa Judge0 mediante un adapter; el backend nunca ejecuta código de candidatos localmente.
+- Web: `http://localhost:5173`
+- API: `http://localhost:3000/health`
+- PostgreSQL: `localhost:5432`
+- SonarQube: `http://localhost:9000`
 
-## Scripts
+El seed es exclusivamente para desarrollo: elimina los datos actuales y crea assessments de demostración, un administrador y una candidata. El acceso del administrador local es `admin@admin.com` / `admin123`.
+
+## Scripts principales
 
 ```bash
-pnpm dev          # API y web en paralelo
-pnpm dev:api      # Solo NestJS
-pnpm dev:web      # Solo React/Vite
-pnpm build        # Compila todos los paquetes
-pnpm typecheck    # Verifica TypeScript
-pnpm db:up        # Inicia PostgreSQL
-pnpm db:down      # Detiene PostgreSQL
-pnpm db:generate  # Genera el cliente Prisma
-pnpm db:migrate   # Crea/aplica una migración de Prisma
-pnpm db:migrate:dev # Crea una migración nueva durante desarrollo
-pnpm db:seed      # Inserta datos demostrativos idempotentes
-pnpm verify:api   # Valida endpoints; requiere `pnpm dev:api` en otra terminal
-pnpm verify:judge0 # Verifica Java, JavaScript y Python contra Judge0
-pnpm verify:execution # Valida ejecución, resultados persistidos y agregado por intento
+pnpm dev                    # API y web
+pnpm dev:api                # Solo NestJS
+pnpm dev:web                # Solo React/Vite
+pnpm build                  # Build de todos los paquetes
+pnpm typecheck              # Validación TypeScript
+
+pnpm db:up                  # PostgreSQL local
+pnpm db:down                # Detiene Docker local
+pnpm db:generate            # Genera Prisma Client
+pnpm db:migrate             # Aplica migraciones existentes
+pnpm db:migrate:dev         # Crea una migración durante desarrollo
+pnpm db:seed                # Restaura los datos demostrativos (destructivo)
+pnpm db:bootstrap           # Crea el admin configurado por variables si no existe
+
+pnpm quality:up             # SonarQube y worker de análisis
+pnpm quality:down           # Detiene servicios de calidad
+pnpm quality:logs           # Logs de SonarQube y worker
+
+pnpm verify:judge0          # Verifica Java, JavaScript y Python en Judge0
 ```
 
-## Flujo candidato
+## Configuración
 
-1. Abrir un assessment publicado e iniciar un intento temporizado.
-2. Resolver preguntas con Monaco Editor y uno de sus lenguajes permitidos.
-3. Crear una submission y ejecutarla en Judge0 contra todos los casos.
-4. Consultar el reporte detallado de tests y el resultado acumulado del assessment.
+`.env.example` contiene todas las variables requeridas. Nunca subas `.env` al repositorio.
 
-El resultado acumulado conserva el último resultado evaluado de cada pregunta. Su puntaje es el promedio ponderado por el puntaje configurado de cada pregunta; las preguntas no enviadas aportan cero.
+- Para desarrollo puede usarse `https://ce.judge0.com`.
+- En un entorno compartido usa una instancia autenticada de Judge0 y secretos aleatorios para JWT, PostgreSQL, SonarQube y el worker.
+- SonarQube Community Build analiza Java, JavaScript, TypeScript y Python. COBOL se evalúa normalmente en Judge0, pero no recibe análisis de calidad.
 
-## Acceso local
-
-La página inicial permite iniciar sesión o crear una cuenta. Todo registro público crea únicamente un usuario con rol `CANDIDATE`; las rutas de candidato y administrador se protegen también en el backend con JWT. Un candidato solo puede ver, abrir e iniciar los retos publicados que un administrador le haya asignado.
-
-El seed incluye este administrador para desarrollo local:
+## API resumida
 
 ```text
-Correo: admin@admin.com
-Contraseña: admin123
+POST /auth/register              POST /auth/login
+GET  /assessments                POST /assessments
+GET  /assessments/:id            PATCH /assessments/:id
+POST /assessments/:id/questions  GET /assessments/:id/questions
+POST /assignments                DELETE /assignments/candidates/:candidateId/assessments/:assessmentId
+POST /assessments/:id/attempts   GET /assessments/:id/attempts/current
+POST /submissions                POST /submissions/:id/execute
+GET  /submissions/:id/results    GET /admin/results
 ```
 
-Estas credenciales no son aptas para un entorno real. Antes de desplegar, define un `JWT_SECRET` largo y aleatorio y crea la cuenta de administración con un mecanismo privado.
+Las rutas requieren autenticación y las operaciones administrativas verifican el rol en el backend.
 
-## API actual
+## Checklist antes de GitHub
 
-```text
-POST /auth/register
-POST /auth/login
-GET  /auth/me
-
-GET  /assignments/candidates
-GET  /assignments/candidates/:candidateId
-POST /assignments
-
-POST /assessments
-GET  /assessments
-GET  /assessments/:id
-POST /assessments/:assessmentId/attempts
-GET  /assessments/:assessmentId/attempts/:attemptId
-GET  /assessments/:assessmentId/attempts/:attemptId/results
-
-POST /assessments/:assessmentId/questions
-GET  /assessments/:assessmentId/questions
-GET  /questions/:id
-
-POST /submissions
-POST /submissions/:id/execute
-GET  /submissions/:id/results
+```bash
+pnpm typecheck
+pnpm build
+git diff --check
 ```
 
-Los endpoints validan payloads, límites, lenguajes permitidos y el tiempo del intento en el servidor. Solo assessments `PUBLISHED` pueden iniciar intentos. Los casos ocultos no exponen input, resultado esperado ni salida de ejecución al cliente.
-
-## Seguridad y límites
-
-- El código no confiable se envía únicamente a Judge0 a través de `CodeExecutionPort`.
-- Judge0 recibe límites de CPU, memoria, procesos, tamaño de archivo, red deshabilitada y timeout total de la operación.
-- Las submissions están limitadas a 30 000 caracteres y a 20 por intento.
-- Las sesiones son JWT de corta duración; las cuentas públicas son siempre candidatas y cada intento/submission se vincula al usuario autenticado.
-- `.env` está excluido del repositorio; `.env.example` contiene solo valores simulados.
-
-Una instancia privada de Judge0 queda fuera del alcance actual. La configuración de producción disponible en [infrastructure/terraform/README.md](infrastructure/terraform/README.md) despliega React en S3/CloudFront y el modular monolith NestJS en una EC2 pequeña detrás de Nginx, con PostgreSQL en RDS privado. Esta alternativa evita el NAT Gateway que requeriría Lambda privada para comunicarse con Judge0 y mantiene el coste base más bajo para la Kata.
+Verifica además que `.env`, `node_modules`, `dist` y archivos temporales continúen fuera del control de versiones.

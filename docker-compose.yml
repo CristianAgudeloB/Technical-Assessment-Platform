@@ -19,5 +19,104 @@ services:
       timeout: 5s
       retries: 10
 
+  sonarqube-db:
+    image: postgres:16-alpine
+    container_name: technical-assessment-sonarqube-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: ${SONARQUBE_DB_PASSWORD}
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: technical-assessment-sonarqube
+    restart: unless-stopped
+    depends_on:
+      sonarqube-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: ${SONARQUBE_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${SONARQUBE_PORT:-9000}:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:9000/api/system/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+
+  sonarqube-bootstrap:
+    image: curlimages/curl:8.12.1
+    container_name: technical-assessment-sonarqube-bootstrap
+    user: "0:0"
+    restart: "no"
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    environment:
+      SONAR_HOST_URL: http://sonarqube:9000
+      SONARQUBE_ADMIN_PASSWORD: ${SONARQUBE_ADMIN_PASSWORD}
+    volumes:
+      - sonarqube_token:/run/sonar
+      - ./scripts/bootstrap-sonarqube.sh:/scripts/bootstrap-sonarqube.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/bootstrap-sonarqube.sh"]
+
+  quality-worker:
+    build:
+      context: ./apps/quality-worker
+    container_name: technical-assessment-quality-worker
+    restart: unless-stopped
+    depends_on:
+      sonarqube-bootstrap:
+        condition: service_completed_successfully
+      quality-worker-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3001
+      QUALITY_WORKER_TOKEN: ${QUALITY_WORKER_TOKEN}
+      SONAR_HOST_URL: http://sonarqube:9000
+      SONAR_TOKEN_FILE: /run/sonar/token
+      SONAR_SCANNER_TIMEOUT_MS: ${QUALITY_ANALYSIS_TIMEOUT_MS:-45000}
+    ports:
+      - "127.0.0.1:${QUALITY_WORKER_PORT:-3001}:3001"
+    volumes:
+      - sonarqube_token:/run/sonar:ro
+      - sonar_scanner_cache:/home/quality/.sonar
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  quality-worker-init:
+    image: busybox:1.37.0
+    container_name: technical-assessment-quality-worker-init
+    restart: "no"
+    volumes:
+      - sonar_scanner_cache:/cache
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["mkdir -p /cache && chown -R 10001:10001 /cache"]
+
 volumes:
   postgres_data:
+  sonarqube_db_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  sonarqube_token:
+  sonar_scanner_cache:

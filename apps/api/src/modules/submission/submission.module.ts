@@ -13,9 +13,10 @@ import { PrismaSubmissionRepository } from './infrastructure/prisma-submission.r
 import { PrismaTestResultRepository } from './infrastructure/prisma-test-result.repository';
 import { SubmissionController } from './presentation/submission.controller';
 import { CodeRunController } from './presentation/code-run.controller';
+import { CodeQualityModule } from '../code-quality/code-quality.module';
 
 @Module({
-  imports: [QuestionModule, ExecutionModule, EvaluationModule, AssessmentAttemptModule],
+  imports: [QuestionModule, ExecutionModule, EvaluationModule, AssessmentAttemptModule, CodeQualityModule],
   controllers: [SubmissionController, CodeRunController],
   providers: [
     CreateSubmissionUseCase,

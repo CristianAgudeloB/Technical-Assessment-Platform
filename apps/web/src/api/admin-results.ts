@@ -35,6 +35,22 @@ export type AdminAssessmentResultDetail = AdminAssessmentResult & {
       sourceCode: string;
       score: number | null;
       submittedAt: string | null;
+      quality: null | {
+        status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'FAILED';
+        qualityGateStatus: string | null;
+        totalIssues: number;
+        bugs: number;
+        codeSmells: number;
+        vulnerabilities: number;
+        issues: Array<{
+          type: 'BUG' | 'CODE_SMELL' | 'VULNERABILITY';
+          severity: string;
+          message: string;
+          rule: string;
+          line: number | null;
+        }>;
+        message: string | null;
+      };
       tests: Array<{
         position: number;
         isHidden: boolean;

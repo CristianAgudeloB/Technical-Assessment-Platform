@@ -8,8 +8,4 @@ coverage/
 .DS_Store
 apps/api/src/generated/
 tmp/
-.terraform/
-*.tfstate
-*.tfstate.*
-terraform.tfvars
 crash.log

@@ -8,19 +8,19 @@
     "dev:api": "pnpm --filter @kata/api dev",
     "dev:web": "pnpm --filter @kata/web dev",
     "build": "pnpm --filter @kata/shared-types build && pnpm --filter @kata/api build && pnpm --filter @kata/web build",
-    "build:web:aws": "VITE_API_URL=/api pnpm --filter @kata/web build",
     "typecheck": "pnpm --filter @kata/shared-types typecheck && pnpm --filter @kata/api typecheck && pnpm --filter @kata/web typecheck",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
+    "quality:up": "docker compose up -d sonarqube quality-worker",
+    "quality:down": "docker compose stop quality-worker sonarqube sonarqube-bootstrap sonarqube-db",
+    "quality:logs": "docker compose logs -f sonarqube quality-worker",
     "db:generate": "pnpm --filter @kata/api prisma generate",
     "db:migrate": "pnpm --filter @kata/api prisma migrate deploy",
     "db:migrate:dev": "pnpm --filter @kata/api prisma migrate dev",
     "db:seed": "pnpm --filter @kata/api db:seed",
     "db:bootstrap": "pnpm --filter @kata/api db:bootstrap",
     "db:insert-demo-assessments": "pnpm --filter @kata/api db:insert-demo-assessments",
-    "verify:api": "bash scripts/verify-assessment-question-api.sh",
-    "verify:judge0": "pnpm --filter @kata/api exec tsx ../../scripts/verify-judge0-adapter.ts",
-    "verify:execution": "bash scripts/verify-first-execution-flow.sh"
+    "verify:judge0": "pnpm --filter @kata/api exec tsx ../../scripts/verify-judge0-adapter.ts"
   }
 }

@@ -77,7 +77,25 @@ export type SubmissionResults = Omit<SubmissionExecutionSummary, 'testResults'> 
   questionsCorrect: number;
   questionsIncorrect: number;
   timeConsumedMs: number;
+  quality: SubmissionQualityReport | null;
   testResults: PersistedTestResult[];
+};
+
+export type SubmissionQualityReport = {
+  status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'FAILED';
+  qualityGateStatus: string | null;
+  totalIssues: number;
+  bugs: number;
+  codeSmells: number;
+  vulnerabilities: number;
+  issues: Array<{
+    type: 'BUG' | 'CODE_SMELL' | 'VULNERABILITY';
+    severity: string;
+    message: string;
+    rule: string;
+    line: number | null;
+  }>;
+  message: string | null;
 };
 
 export function createSubmission(request: CreateSubmissionRequest) {

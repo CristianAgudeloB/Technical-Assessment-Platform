@@ -34,6 +34,7 @@ import {
   AssessmentAttemptRepository,
 } from '../../assessment-attempt/domain/assessment-attempt.repository';
 import { calculateAssessmentProgress } from '../../evaluation/application/calculate-assessment-progress';
+import { AnalyzeSubmissionQualityUseCase } from '../../code-quality/application/analyze-submission-quality.use-case';
 
 export type NormalizedTestResult = {
   id: string;
@@ -77,6 +78,7 @@ export class ExecuteSubmissionUseCase {
     private readonly scoringStrategy: ScoringStrategy,
     private readonly evaluateExecutionResult: EvaluateExecutionResultUseCase,
     private readonly validateAssessmentAttempt: ValidateAssessmentAttemptUseCase,
+    private readonly analyzeSubmissionQuality: AnalyzeSubmissionQualityUseCase,
   ) {}
 
   async execute(submissionId: string, userId: string): Promise<ExecuteSubmissionResult> {
@@ -163,6 +165,8 @@ export class ExecuteSubmissionUseCase {
 
     await this.submissionRepository.markAsEvaluated(submission.id, score);
     await this.persistAssessmentProgress(assessmentAttempt);
+    await this.analyzeSubmissionQuality.markPending(submission.id);
+    void this.analyzeSubmissionQuality.execute(submission).catch(() => undefined);
 
     return {
       submissionId: submission.id,

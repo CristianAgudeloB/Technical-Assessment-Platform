@@ -17,6 +17,10 @@ import {
   TEST_RESULT_REPOSITORY,
   TestResultRepository,
 } from '../../submission/domain/test-result.repository';
+import {
+  SUBMISSION_QUALITY_REPORT_REPOSITORY,
+  SubmissionQualityReportRepository,
+} from '../../code-quality/domain/submission-quality-report.repository';
 
 export type AdminAssessmentResultDetail = {
   id: string;
@@ -43,6 +47,22 @@ export type AdminAssessmentResultDetail = {
       sourceCode: string;
       score: number | null;
       submittedAt: Date | null;
+      quality: null | {
+        status: 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'FAILED';
+        qualityGateStatus: string | null;
+        totalIssues: number;
+        bugs: number;
+        codeSmells: number;
+        vulnerabilities: number;
+        issues: Array<{
+          type: 'BUG' | 'CODE_SMELL' | 'VULNERABILITY';
+          severity: string;
+          message: string;
+          rule: string;
+          line: number | null;
+        }>;
+        message: string | null;
+      };
       tests: Array<{
         position: number;
         isHidden: boolean;
@@ -68,6 +88,8 @@ export class GetAdminAssessmentResultDetailUseCase {
     private readonly submissionRepository: SubmissionRepository,
     @Inject(TEST_RESULT_REPOSITORY)
     private readonly testResultRepository: TestResultRepository,
+    @Inject(SUBMISSION_QUALITY_REPORT_REPOSITORY)
+    private readonly qualityReports: SubmissionQualityReportRepository,
   ) {}
 
   async execute(attemptId: string): Promise<AdminAssessmentResultDetail> {
@@ -85,11 +107,14 @@ export class GetAdminAssessmentResultDetailUseCase {
       }
     }
 
-    const testsBySubmission = new Map(
+    const testAndQualityBySubmission = new Map(
       await Promise.all(
         [...latestSubmissionByQuestion.values()].map(async (submission) => [
           submission.id,
-          await this.testResultRepository.findBySubmissionId(submission.id),
+          await Promise.all([
+            this.testResultRepository.findBySubmissionId(submission.id),
+            this.qualityReports.findBySubmissionId(submission.id),
+          ]),
         ] as const),
       ),
     );
@@ -99,7 +124,9 @@ export class GetAdminAssessmentResultDetailUseCase {
       totalQuestions: questions.length,
       questions: questions.map((question) => {
         const submission = latestSubmissionByQuestion.get(question.id);
-        const tests = submission ? testsBySubmission.get(submission.id) ?? [] : [];
+        const [tests, qualityReport] = submission
+          ? testAndQualityBySubmission.get(submission.id) ?? [[], null]
+          : [[], null];
 
         return {
           id: question.id,
@@ -113,6 +140,18 @@ export class GetAdminAssessmentResultDetailUseCase {
                 sourceCode: submission.sourceCode,
                 score: submission.score,
                 submittedAt: submission.submittedAt,
+                quality: qualityReport
+                  ? {
+                      status: qualityReport.status,
+                      qualityGateStatus: qualityReport.qualityGateStatus,
+                      totalIssues: qualityReport.totalIssues,
+                      bugs: qualityReport.bugs,
+                      codeSmells: qualityReport.codeSmells,
+                      vulnerabilities: qualityReport.vulnerabilities,
+                      issues: qualityReport.issues,
+                      message: qualityReport.errorMessage,
+                    }
+                  : null,
                 tests: tests.map((test) => {
                   const testCase = question.testCases.find(({ id }) => id === test.testCaseId);
                   return {
