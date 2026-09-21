@@ -34,8 +34,6 @@ createServer(async (request, response) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No fue posible analizar el código.';
     console.error('Quality analysis failed:', message);
-    // Scanner output can include internal paths and service details. Preserve
-    // it only in worker logs; API consumers get a safe generic message.
     return sendJson(response, 422, { error: 'No fue posible completar el análisis de calidad.' });
   }
 }).listen(port, '0.0.0.0');

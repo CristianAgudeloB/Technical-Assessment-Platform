@@ -25,8 +25,6 @@ export class ListAdminAssessmentResultsUseCase {
   async execute(): Promise<AdminAssessmentResult[]> {
     const results = await this.attemptRepository.findResultsForAdmin();
 
-    // Attempts completed before status persistence was added can remain ACTIVE.
-    // Reconcile them here so the stored state is correct for future requests.
     await Promise.all(results.map((result) => this.completeFinishedAttempt(result)));
 
     return this.attemptRepository.findResultsForAdmin();

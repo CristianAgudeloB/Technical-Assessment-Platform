@@ -21,6 +21,5 @@ export function saveEditorDraft(attemptId: string, questionId: string, draft: Ed
   try {
     sessionStorage.setItem(keyFor(attemptId, questionId), JSON.stringify(draft));
   } catch {
-    // El navegador puede bloquear el almacenamiento; el editor continúa funcionando sin borrador.
   }
 }

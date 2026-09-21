@@ -37,8 +37,6 @@ export class AnalyzeSubmissionQualityUseCase {
 
       return this.qualityReports.saveAnalysis(submission.id, analysis);
     } catch {
-      // Quality feedback is optional. Do not persist transport or scanner
-      // details because this report is visible to the candidate.
       return this.qualityReports.saveFailure(
         submission.id,
         'El análisis de calidad no estuvo disponible.',

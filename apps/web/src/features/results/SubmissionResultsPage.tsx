@@ -78,7 +78,6 @@ export function SubmissionResultsPage() {
     }
 
     const controller = new AbortController();
-    // Keep the functional result on screen while the optional report refreshes.
     if (qualityRefresh === 0) {
       setLoading(true);
     }
