@@ -105,13 +105,3 @@ GET  /submissions/:id/results    GET /admin/results
 ```
 
 Las rutas requieren autenticación y las operaciones administrativas verifican el rol en el backend.
-
-## Checklist antes de GitHub
-
-```bash
-pnpm typecheck
-pnpm build
-git diff --check
-```
-
-Verifica además que `.env`, `node_modules`, `dist` y archivos temporales continúen fuera del control de versiones.
