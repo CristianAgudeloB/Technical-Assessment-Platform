@@ -5,6 +5,11 @@ import {
   AssessmentRepository,
 } from '../../assessment/domain/assessment.repository';
 import { Question } from '../domain/question';
+import { AssessmentStatus } from '../../assessment/domain/assessment';
+import {
+  ASSESSMENT_ASSIGNMENT_REPOSITORY,
+  AssessmentAssignmentRepository,
+} from '../../assignment/domain/assessment-assignment.repository';
 import {
   QUESTION_REPOSITORY,
   QuestionRepository,
@@ -17,12 +22,18 @@ export class ListAssessmentQuestionsUseCase {
     private readonly assessmentRepository: AssessmentRepository,
     @Inject(QUESTION_REPOSITORY)
     private readonly questionRepository: QuestionRepository,
+    @Inject(ASSESSMENT_ASSIGNMENT_REPOSITORY)
+    private readonly assignmentRepository: AssessmentAssignmentRepository,
   ) {}
 
-  async execute(assessmentId: string): Promise<Question[]> {
+  async execute(assessmentId: string, candidateUserId?: string): Promise<Question[]> {
     const assessment = await this.assessmentRepository.findById(assessmentId);
 
-    if (!assessment) {
+    if (!assessment || (candidateUserId && assessment.status !== AssessmentStatus.PUBLISHED)) {
+      throw new EntityNotFoundError('Assessment', assessmentId);
+    }
+
+    if (candidateUserId && !(await this.assignmentRepository.findAvailable(candidateUserId, assessmentId))) {
       throw new EntityNotFoundError('Assessment', assessmentId);
     }
 

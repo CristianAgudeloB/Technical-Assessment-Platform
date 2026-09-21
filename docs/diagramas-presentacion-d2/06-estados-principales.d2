@@ -1,0 +1,18 @@
+direction: right
+
+attempt: Estado del intento {
+  active: ACTIVE
+  completed: COMPLETED
+  expired: EXPIRED
+  active -> completed: todas las preguntas evaluadas
+  active -> expired: vence expiresAt
+}
+
+submission: Estado de la submission {
+  draft: DRAFT
+  pending: PENDING
+  evaluated: EVALUATED
+  draft -> pending: inicia ejecucion
+  pending -> evaluated: guarda resultados
+  pending -> draft: error libera reclamo
+}

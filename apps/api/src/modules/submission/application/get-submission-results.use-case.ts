@@ -3,6 +3,10 @@ import { EntityNotFoundError, SubmissionResultsNotAvailableError } from '../../.
 import { QUESTION_REPOSITORY, QuestionRepository } from '../../question/domain/question.repository';
 import { SUBMISSION_REPOSITORY, SubmissionRepository } from '../domain/submission.repository';
 import { TEST_RESULT_REPOSITORY, TestResultRepository } from '../domain/test-result.repository';
+import {
+  ASSESSMENT_ATTEMPT_REPOSITORY,
+  AssessmentAttemptRepository,
+} from '../../assessment-attempt/domain/assessment-attempt.repository';
 
 export type SubmissionResultsResponse = {
   submissionId: string;
@@ -25,6 +29,7 @@ export type SubmissionResultsResponse = {
     testCaseId: string;
     position: number;
     isHidden: boolean;
+    expectedOutput: string | null;
     status: string;
     passed: boolean;
     stdout: string | null;
@@ -44,12 +49,23 @@ export class GetSubmissionResultsUseCase {
     private readonly questionRepository: QuestionRepository,
     @Inject(TEST_RESULT_REPOSITORY)
     private readonly testResultRepository: TestResultRepository,
+    @Inject(ASSESSMENT_ATTEMPT_REPOSITORY)
+    private readonly attemptRepository: AssessmentAttemptRepository,
   ) {}
 
-  async execute(submissionId: string): Promise<SubmissionResultsResponse> {
+  async execute(submissionId: string, userId: string): Promise<SubmissionResultsResponse> {
     const submission = await this.submissionRepository.findById(submissionId);
 
     if (!submission) {
+      throw new EntityNotFoundError('Submission', submissionId);
+    }
+
+    if (!submission.assessmentAttemptId) {
+      throw new EntityNotFoundError('Submission', submissionId);
+    }
+
+    const attempt = await this.attemptRepository.findById(submission.assessmentAttemptId);
+    if (!attempt || attempt.userId !== userId) {
       throw new EntityNotFoundError('Submission', submissionId);
     }
 
@@ -73,6 +89,7 @@ export class GetSubmissionResultsUseCase {
         testCaseId: result.testCaseId,
         position: testCase?.position ?? 0,
         isHidden: testCase?.isHidden ?? true,
+        expectedOutput: testCase?.isHidden ? null : testCase?.expectedOutput ?? null,
         status: result.status,
         passed: result.status === 'ACCEPTED',
         stdout: testCase?.isHidden ? null : result.stdout,

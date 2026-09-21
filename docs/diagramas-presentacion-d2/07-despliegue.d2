@@ -1,0 +1,20 @@
+direction: down
+
+user: Usuario { shape: person }
+cloudfront: CloudFront
+s3: S3 privado {
+  web: React compilado
+}
+ec2: EC2 publica {
+  nginx: Nginx
+  api: API NestJS
+}
+rds: RDS PostgreSQL privado
+judge: Judge0 externo
+
+user -> cloudfront: HTTPS
+cloudfront -> s3.web: contenido estatico
+cloudfront -> ec2.nginx: ruta /api
+ec2.nginx -> ec2.api
+ec2.api -> rds: red privada
+ec2.api -> judge: HTTPS

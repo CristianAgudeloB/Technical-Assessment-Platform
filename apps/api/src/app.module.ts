@@ -9,10 +9,14 @@ import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { QuestionModule } from './modules/question/question.module';
 import { SubmissionModule } from './modules/submission/submission.module';
 import { PrismaModule } from './shared/infrastructure/database/prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { AssignmentModule } from './modules/assignment/assignment.module';
 
 @Module({
   imports: [
     PrismaModule,
+    AuthModule,
+    AssignmentModule,
     AssessmentModule,
     AssessmentAttemptModule,
     AssessmentResultModule,

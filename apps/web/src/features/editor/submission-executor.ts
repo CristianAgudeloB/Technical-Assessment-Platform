@@ -20,11 +20,11 @@ export type SubmissionExecutionFeedback = {
 };
 
 export interface SubmissionExecutor {
-  execute(draft: SubmissionDraft): Promise<SubmissionExecutionFeedback>;
+  submit(draft: SubmissionDraft): Promise<SubmissionExecutionFeedback>;
 }
 
 class ApiSubmissionExecutor implements SubmissionExecutor {
-  async execute(draft: SubmissionDraft): Promise<SubmissionExecutionFeedback> {
+  async submit(draft: SubmissionDraft): Promise<SubmissionExecutionFeedback> {
     const submission = await createSubmission(draft);
     const result = await executeSubmission(submission.id);
 
@@ -32,7 +32,7 @@ class ApiSubmissionExecutor implements SubmissionExecutor {
       status: 'EVALUATED',
       submissionId: submission.id,
       result,
-      message: `Evaluation complete: ${result.passedTests} of ${result.totalTests} tests passed.`,
+      message: `Evaluación completada: ${result.passedTests} de ${result.totalTests} pruebas aprobadas.`,
     };
   }
 }

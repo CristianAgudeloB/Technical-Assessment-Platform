@@ -1,6 +1,6 @@
 import { getJson, postJson } from './http';
 
-export type AssessmentAttemptStatus = 'ACTIVE' | 'EXPIRED';
+export type AssessmentAttemptStatus = 'ACTIVE' | 'COMPLETED' | 'EXPIRED';
 
 export type AssessmentAttempt = {
   id: string;
@@ -8,6 +8,7 @@ export type AssessmentAttempt = {
   status: AssessmentAttemptStatus;
   startedAt: string;
   expiresAt: string;
+  completedAt: string | null;
   expiredAt: string | null;
   score: number | null;
   questionsCorrect: number;
@@ -47,6 +48,10 @@ export function startAssessmentAttempt(assessmentId: string) {
 
 export function getAssessmentAttempt(assessmentId: string, attemptId: string, signal?: AbortSignal) {
   return getJson<AssessmentAttempt>(`/assessments/${assessmentId}/attempts/${attemptId}`, signal);
+}
+
+export function getCurrentAssessmentAttempt(assessmentId: string, signal?: AbortSignal) {
+  return getJson<AssessmentAttempt | null>(`/assessments/${assessmentId}/attempts/current`, signal);
 }
 
 export function getAssessmentAttemptResults(assessmentId: string, attemptId: string, signal?: AbortSignal) {

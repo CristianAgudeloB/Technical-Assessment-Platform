@@ -1,0 +1,119 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf update -y
+dnf install -y docker nginx
+systemctl enable --now docker
+systemctl enable --now nginx
+
+install -d -m 0750 /opt/technical-assessment
+
+cat >/etc/nginx/conf.d/technical-assessment.conf <<'NGINX'
+server {
+  listen 80 default_server;
+  server_name _;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:3000/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 35s;
+  }
+
+  location = /health {
+    return 404;
+  }
+}
+NGINX
+
+nginx -t
+systemctl reload nginx
+
+cat >/usr/local/bin/technical-assessment-refresh-env <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+region="${aws_region}"
+parameter() {
+  aws ssm get-parameter --region "$region" --with-decryption --name "$1" --query 'Parameter.Value' --output text
+}
+
+umask 077
+cat >/opt/technical-assessment/api.env <<EOF
+NODE_ENV=production
+API_PORT=3000
+DATABASE_URL=$(parameter "${database_url_parameter}")
+JWT_SECRET=$(parameter "${jwt_secret_parameter}")
+WEB_ORIGIN=$(parameter "${web_origin_parameter}")
+JUDGE0_BASE_URL=${judge0_base_url}
+JUDGE0_REQUEST_TIMEOUT_MS=8000
+JUDGE0_TOTAL_TIMEOUT_MS=20000
+JUDGE0_POLL_INTERVAL_MS=250
+JUDGE0_MAX_POLLING_ATTEMPTS=60
+JUDGE0_CPU_TIME_LIMIT_SECONDS=2
+JUDGE0_WALL_TIME_LIMIT_SECONDS=5
+JUDGE0_MEMORY_LIMIT_KB=128000
+JUDGE0_MAX_PROCESSES=32
+JUDGE0_MAX_FILE_SIZE_KB=1024
+EOF
+
+if [ -n "${judge0_auth_token_parameter}" ]; then
+  printf 'JUDGE0_AUTH_TOKEN=%s\n' "$(parameter "${judge0_auth_token_parameter}")" >>/opt/technical-assessment/api.env
+fi
+chmod 600 /opt/technical-assessment/api.env
+SCRIPT
+chmod 750 /usr/local/bin/technical-assessment-refresh-env
+
+cat >/usr/local/bin/technical-assessment-bootstrap-admin <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: technical-assessment-bootstrap-admin <image>" >&2
+  exit 64
+fi
+
+region="${aws_region}"
+parameter() {
+  aws ssm get-parameter --region "$region" --with-decryption --name "$1" --query 'Parameter.Value' --output text
+}
+
+docker run --rm \
+  --env-file /opt/technical-assessment/api.env \
+  -e "INITIAL_ADMIN_EMAIL=$(parameter "${initial_admin_email_parameter}")" \
+  -e "INITIAL_ADMIN_DISPLAY_NAME=$(parameter "${initial_admin_display_name_parameter}")" \
+  -e "INITIAL_ADMIN_PASSWORD=$(parameter "${initial_admin_password_parameter}")" \
+  "$1" node apps/api/dist/scripts/bootstrap-admin.js
+SCRIPT
+chmod 750 /usr/local/bin/technical-assessment-bootstrap-admin
+
+cat >/usr/local/bin/technical-assessment-deploy-api <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: technical-assessment-deploy-api <image-tag>" >&2
+  exit 64
+fi
+
+image="${ecr_repository_url}:$1"
+registry=$(printf '%s' "$image" | cut -d/ -f1)
+aws ecr get-login-password --region "${aws_region}" | docker login --username AWS --password-stdin "$registry"
+/usr/local/bin/technical-assessment-refresh-env
+docker pull "$image"
+docker run --rm \
+  --env-file /opt/technical-assessment/api.env \
+  "$image" pnpm --filter @kata/api prisma migrate deploy
+/usr/local/bin/technical-assessment-bootstrap-admin "$image"
+docker rm -f technical-assessment-api >/dev/null 2>&1 || true
+docker run -d \
+  --name technical-assessment-api \
+  --restart unless-stopped \
+  --env-file /opt/technical-assessment/api.env \
+  -p 127.0.0.1:3000:3000 \
+  "$image"
+SCRIPT
+chmod 750 /usr/local/bin/technical-assessment-deploy-api

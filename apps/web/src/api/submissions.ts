@@ -1,6 +1,7 @@
 import { getJson, postJson } from './http';
+import type { ProgrammingLanguage } from '@kata/shared-types';
 
-export type ProgrammingLanguage = 'JAVA' | 'JAVASCRIPT' | 'PYTHON' | 'TYPESCRIPT' | 'COBOL';
+export type { ProgrammingLanguage };
 
 export type CreateSubmissionRequest = {
   assessmentAttemptId: string;
@@ -13,7 +14,7 @@ export type CreateSubmissionResponse = {
   id: string;
 };
 
-export type PersistedTestResult = {
+type SubmissionTestResult = {
   id: string;
   testCaseId: string;
   position: number;
@@ -34,6 +35,11 @@ export type PersistedTestResult = {
   memoryKb: number | null;
 };
 
+export type PersistedTestResult = SubmissionTestResult & {
+  /** Available only in the persisted-results view and never for hidden tests. */
+  expectedOutput: string | null;
+};
+
 export type SubmissionExecutionSummary = {
   submissionId: string;
   questionId: string;
@@ -41,10 +47,26 @@ export type SubmissionExecutionSummary = {
   passedTests: number;
   failedTests: number;
   score: number;
-  testResults: PersistedTestResult[];
+  testResults: SubmissionTestResult[];
 };
 
-export type SubmissionResults = SubmissionExecutionSummary & {
+export type CodeRunResult = {
+  status:
+    | 'ACCEPTED'
+    | 'COMPILATION_ERROR'
+    | 'RUNTIME_ERROR'
+    | 'TIME_LIMIT_EXCEEDED'
+    | 'MEMORY_LIMIT_EXCEEDED'
+    | 'INTERNAL_ERROR';
+  stdout: string | null;
+  stderr: string | null;
+  compileOutput: string | null;
+  message: string | null;
+  executionTimeMs: number | null;
+  memoryKb: number | null;
+};
+
+export type SubmissionResults = Omit<SubmissionExecutionSummary, 'testResults'> & {
   assessmentId: string;
   question: {
     id: string;
@@ -55,6 +77,7 @@ export type SubmissionResults = SubmissionExecutionSummary & {
   questionsCorrect: number;
   questionsIncorrect: number;
   timeConsumedMs: number;
+  testResults: PersistedTestResult[];
 };
 
 export function createSubmission(request: CreateSubmissionRequest) {
@@ -63,6 +86,14 @@ export function createSubmission(request: CreateSubmissionRequest) {
 
 export function executeSubmission(submissionId: string) {
   return postJson<SubmissionExecutionSummary>(`/submissions/${submissionId}/execute`, {});
+}
+
+export function runCode(input: CreateSubmissionRequest & { assessmentId: string; stdin: string }) {
+  const { assessmentId, assessmentAttemptId, questionId, language, sourceCode, stdin } = input;
+  return postJson<CodeRunResult>(
+    `/assessments/${assessmentId}/attempts/${assessmentAttemptId}/questions/${questionId}/run`,
+    { language, sourceCode, stdin },
+  );
 }
 
 export function getSubmissionResults(submissionId: string, signal?: AbortSignal) {

@@ -12,7 +12,9 @@ export class ListAssessmentsUseCase {
     private readonly assessmentRepository: AssessmentRepository,
   ) {}
 
-  execute(): Promise<Assessment[]> {
-    return this.assessmentRepository.findAll();
+  execute(candidateUserId?: string): Promise<Assessment[]> {
+    return candidateUserId
+      ? this.assessmentRepository.findPublishedAssignedToUser(candidateUserId)
+      : this.assessmentRepository.findAll();
   }
 }

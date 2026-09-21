@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AssessmentModule } from '../assessment/assessment.module';
+import { AssignmentModule } from '../assignment/assignment.module';
 import { GetAssessmentAttemptUseCase } from './application/get-assessment-attempt.use-case';
+import { GetCurrentAssessmentAttemptUseCase } from './application/get-current-assessment-attempt.use-case';
 import { StartAssessmentAttemptUseCase } from './application/start-assessment-attempt.use-case';
 import { ValidateAssessmentAttemptUseCase } from './application/validate-assessment-attempt.use-case';
 import { ASSESSMENT_ATTEMPT_REPOSITORY } from './domain/assessment-attempt.repository';
@@ -8,10 +10,11 @@ import { PrismaAssessmentAttemptRepository } from './infrastructure/prisma-asses
 import { AssessmentAttemptController } from './presentation/assessment-attempt.controller';
 
 @Module({
-  imports: [AssessmentModule],
+  imports: [AssessmentModule, AssignmentModule],
   controllers: [AssessmentAttemptController],
   providers: [
     GetAssessmentAttemptUseCase,
+    GetCurrentAssessmentAttemptUseCase,
     StartAssessmentAttemptUseCase,
     ValidateAssessmentAttemptUseCase,
     PrismaAssessmentAttemptRepository,

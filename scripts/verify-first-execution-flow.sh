@@ -3,16 +3,26 @@
 set -euo pipefail
 
 api_url="${API_URL:-http://localhost:3000}"
-suffix="$(date +%s)"
 
 curl --fail --silent --show-error "${api_url}/health" >/dev/null
 
 assessment="$(curl --fail --silent --show-error \
   --request POST "${api_url}/assessments" \
   --header 'content-type: application/json' \
-  --data "{\"slug\":\"execution-validation-${suffix}\",\"name\":\"Execution validation assessment\",\"description\":\"Assessment used to validate the first execution flow.\",\"durationMinutes\":30,\"status\":\"PUBLISHED\"}")"
+  --data "{\"name\":\"Execution validation assessment\",\"description\":\"Assessment used to validate the first execution flow.\",\"durationMinutes\":30}")"
 
 assessment_id="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).id)' "$assessment")"
+
+question="$(curl --fail --silent --show-error \
+  --request POST "${api_url}/assessments/${assessment_id}/questions" \
+  --header 'content-type: application/json' \
+  --data '{"title":"Suma de dos números","description":"Lee dos enteros separados por espacios e imprime su suma.","position":1,"score":100,"allowedLanguages":["PYTHON"],"testCases":[{"position":1,"input":"2 3\n","expectedOutput":"5\n","isHidden":false},{"position":2,"input":"-4 10\n","expectedOutput":"6\n","isHidden":true}]}')"
+
+question_id="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).id)' "$question")"
+
+curl --fail --silent --show-error \
+  --request POST "${api_url}/assessments/${assessment_id}/publish" \
+  >/dev/null
 
 attempt="$(curl --fail --silent --show-error \
   --request POST "${api_url}/assessments/${assessment_id}/attempts")"
@@ -23,12 +33,30 @@ attempt_id="$(node -e '
   process.stdout.write(attempt.id);
 ' "$attempt")"
 
-question="$(curl --fail --silent --show-error \
-  --request POST "${api_url}/assessments/${assessment_id}/questions" \
+preview_result="$(curl --fail --silent --show-error \
+  --request POST "${api_url}/assessments/${assessment_id}/attempts/${attempt_id}/questions/${question_id}/run" \
   --header 'content-type: application/json' \
-  --data '{"slug":"sum-two-numbers","title":"Suma de dos números","description":"Lee dos enteros separados por espacios e imprime su suma.","position":1,"score":100,"allowedLanguages":["PYTHON"],"testCases":[{"position":1,"input":"2 3\n","expectedOutput":"5\n","isHidden":false},{"position":2,"input":"-4 10\n","expectedOutput":"6\n","isHidden":true}]}')"
+  --data '{"language":"PYTHON","sourceCode":"import sys\nprint(sum(map(int, sys.stdin.read().split())))\n","stdin":"2 3\n"}')"
 
-question_id="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).id)' "$question")"
+node -e '
+  const result = JSON.parse(process.argv[1]);
+  const valid = result.status === "ACCEPTED"
+    && result.stdout === "5\n"
+    && !Object.hasOwn(result, "submissionId")
+    && !Object.hasOwn(result, "score");
+  if (!valid) {
+    console.error(JSON.stringify(result, null, 2));
+    process.exit(1);
+  }
+' "$preview_result"
+
+preview_progress="$(curl --fail --silent --show-error \
+  "${api_url}/assessments/${assessment_id}/attempts/${attempt_id}/results")"
+
+node -e '
+  const result = JSON.parse(process.argv[1]);
+  if (result.completedQuestions !== 0 || result.questionsPending !== 1 || result.score !== 0) process.exit(1);
+' "$preview_progress"
 
 submission="$(curl --fail --silent --show-error \
   --request POST "${api_url}/submissions" \

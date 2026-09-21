@@ -79,7 +79,7 @@ export class ExecuteSubmissionUseCase {
     private readonly validateAssessmentAttempt: ValidateAssessmentAttemptUseCase,
   ) {}
 
-  async execute(submissionId: string): Promise<ExecuteSubmissionResult> {
+  async execute(submissionId: string, userId: string): Promise<ExecuteSubmissionResult> {
     const submission = await this.submissionRepository.findById(submissionId);
 
     if (!submission) {
@@ -103,6 +103,7 @@ export class ExecuteSubmissionUseCase {
     const assessmentAttempt = await this.validateAssessmentAttempt.assertActive(
       submission.assessmentAttemptId,
       question.assessmentId,
+      userId,
     );
 
     const claimed = await this.submissionRepository.claimForExecution(submission.id);
@@ -117,6 +118,7 @@ export class ExecuteSubmissionUseCase {
       await this.validateAssessmentAttempt.assertActive(
         submission.assessmentAttemptId,
         question.assessmentId,
+        userId,
       );
       const execution = await this.executeCode({
         language: submission.language,
@@ -126,6 +128,7 @@ export class ExecuteSubmissionUseCase {
       await this.validateAssessmentAttempt.assertActive(
         submission.assessmentAttemptId,
         question.assessmentId,
+        userId,
       );
       const evaluation = this.evaluateExecutionResult.execute(execution, testCase.expectedOutput);
       const storedResult = await this.testResultRepository.upsert({
@@ -184,14 +187,21 @@ export class ExecuteSubmissionUseCase {
       this.submissionRepository.findEvaluatedByAttemptId(assessmentAttempt.id),
     ]);
     const progress = calculateAssessmentProgress(questions, submissions);
-
-    await this.assessmentAttemptRepository.updateSummary(assessmentAttempt.id, {
+    const now = new Date();
+    const summary = {
       score: progress.score,
       completedQuestions: progress.completedQuestions,
       questionsCorrect: progress.questionsCorrect,
       questionsIncorrect: progress.questionsIncorrect,
-      timeConsumedSeconds: secondsSince(assessmentAttempt.startedAt, new Date(), assessmentAttempt.expiresAt),
-    });
+      timeConsumedSeconds: secondsSince(assessmentAttempt.startedAt, now, assessmentAttempt.expiresAt),
+    };
+
+    if (progress.questionsPending === 0) {
+      await this.assessmentAttemptRepository.complete(assessmentAttempt.id, now, summary);
+      return;
+    }
+
+    await this.assessmentAttemptRepository.updateSummary(assessmentAttempt.id, summary);
   }
 
   private async executeCode(input: {

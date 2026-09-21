@@ -1,23 +1,27 @@
-import { useEffect } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router';
-import { useDemoRole, type DemoRole } from '../features/roles/RoleContext';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router';
+import { useAuth } from '../features/auth/AuthContext';
 
 export function AppLayout() {
-  const { role, setRole } = useDemoRole();
-  const location = useLocation();
-
-  useEffect(() => {
-    const routeRole: DemoRole = location.pathname.startsWith('/admin') ? 'ADMIN' : 'CANDIDATE';
-    if (role !== routeRole) setRole(routeRole);
-  }, [location.pathname, role, setRole]);
-  const navigation = role === 'ADMIN'
-    ? [{ to: '/admin', label: 'Administración' }]
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const navigation = isAdmin
+    ? [
+        { to: '/admin', label: 'Retos' },
+        { to: '/admin/assignments', label: 'Asignaciones' },
+        { to: '/admin/results', label: 'Resultados' },
+      ]
     : [{ to: '/assessments', label: 'Retos disponibles' }];
+
+  const endSession = () => {
+    logout();
+    navigate('/', { replace: true });
+  };
 
   return (
     <div className="app-shell">
-      <aside className="side-rail" aria-label="Primary navigation">
-        <Link to="/" className="brand" aria-label="Ir al inicio">
+      <aside className="side-rail" aria-label="Navegación principal">
+        <Link to={isAdmin ? '/admin' : '/assessments'} className="brand" aria-label="Ir al inicio">
           <span className="brand-mark" aria-hidden="true">TA</span>
           <span>
             <strong>Technical Assessment Platform</strong>
@@ -38,13 +42,12 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <Link className="change-role-link" to="/">Cambiar perfil</Link>
       </aside>
 
       <main className="main-panel">
         <header className="topbar">
-          <span className="eyebrow">Technical Assessment Platform</span>
-          <Link className="topbar-link" to="/">Cambiar perfil</Link>
+          <span className="topbar-user">{user?.displayName}</span>
+          <button className="topbar-link" type="button" onClick={endSession}>Cerrar sesión</button>
         </header>
         <div className="page-content">
           <Outlet />

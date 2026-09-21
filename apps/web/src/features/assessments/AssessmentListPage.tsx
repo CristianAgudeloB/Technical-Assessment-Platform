@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import {
-  AssessmentStatus,
-  AssessmentSummary,
-  listAssessments,
-} from '../../api/assessments';
+import { AssessmentSummary, listAssessments } from '../../api/assessments';
 import { ApiError } from '../../api/http';
 
 type LoadState =
@@ -12,19 +8,10 @@ type LoadState =
   | { kind: 'success'; assessments: AssessmentSummary[] }
   | { kind: 'error'; message: string };
 
-const statusLabel: Record<AssessmentStatus, string> = {
-  DRAFT: 'Borrador',
-  PUBLISHED: 'Publicado',
-  ARCHIVED: 'Archivado',
-};
-
-function formatDate(value: string | null) {
-  if (!value) return 'Sin publicar';
-
+function formatAvailability(value: string) {
   return new Intl.DateTimeFormat('es-CO', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
+    dateStyle: 'medium',
+    timeStyle: 'short',
   }).format(new Date(value));
 }
 
@@ -53,8 +40,7 @@ export function AssessmentListPage() {
     <section className="assessment-page" aria-labelledby="page-title">
       <div className="page-heading">
         <div>
-          <p className="section-kicker">Retos técnicos</p>
-          <h1 id="page-title">Retos disponibles</h1>
+          <h1 id="page-title">Mis retos</h1>
           <p className="page-intro">
             Elige un reto para revisar sus instrucciones, resolver sus ejercicios y consultar tu progreso.
           </p>
@@ -63,7 +49,7 @@ export function AssessmentListPage() {
           <span className="summary-number">
             {state.kind === 'success' ? state.assessments.length : '—'}
           </span>
-          <span>disponibles</span>
+          <span>asignados</span>
         </div>
       </div>
 
@@ -83,8 +69,8 @@ export function AssessmentListPage() {
         <div className="status-panel empty-panel">
           <span className="status-symbol" aria-hidden="true">+</span>
           <div>
-            <h2>Aún no hay retos</h2>
-            <p>Crea el primer reto desde el espacio de administración.</p>
+            <h2>Aún no tienes retos asignados</h2>
+            <p>Cuando un administrador te asigne un reto, aparecerá aquí.</p>
           </div>
         </div>
       )}
@@ -98,14 +84,13 @@ export function AssessmentListPage() {
                 <span>min</span>
               </div>
               <div className="assessment-copy">
-                <div className="assessment-meta">
-                  <span className={`status-pill ${assessment.status.toLowerCase()}`}>
-                    {statusLabel[assessment.status]}
-                  </span>
-                  <span>{formatDate(assessment.publishedAt)}</span>
-                </div>
                 <h2>{assessment.name}</h2>
                 <p>{assessment.description}</p>
+                {assessment.availableFrom && assessment.availableUntil && (
+                  <p className="assessment-availability">
+                    Disponible del {formatAvailability(assessment.availableFrom)} al {formatAvailability(assessment.availableUntil)}
+                  </p>
+                )}
               </div>
               <Link className="open-link" to={`/assessments/${assessment.id}`}>
                 Ver reto <span aria-hidden="true">→</span>

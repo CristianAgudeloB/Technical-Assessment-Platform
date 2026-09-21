@@ -6,7 +6,6 @@ export enum AssessmentStatus {
 
 export type Assessment = {
   id: string;
-  slug: string;
   name: string;
   description: string;
   durationMinutes: number;
@@ -14,9 +13,13 @@ export type Assessment = {
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  availableFrom?: Date;
+  availableUntil?: Date;
 };
 
 export type CreateAssessmentData = Pick<
   Assessment,
-  'slug' | 'name' | 'description' | 'durationMinutes'
+  'name' | 'description' | 'durationMinutes'
 >;
+
+export type UpdateAssessmentData = CreateAssessmentData;

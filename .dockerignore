@@ -1,0 +1,10 @@
+.git/
+.terraform/
+node_modules/
+**/node_modules/
+**/dist/
+apps/api/src/generated/
+.env
+*.tfstate
+coverage/
+tmp/

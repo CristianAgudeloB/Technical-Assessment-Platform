@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   EntityNotFoundError,
   LanguageNotAllowedForQuestionError,
+  QuestionAlreadySubmittedError,
   SubmissionLimitExceededError,
 } from '../../../shared/domain/errors/domain-errors';
 import {
@@ -27,7 +28,7 @@ export class CreateSubmissionUseCase {
     private readonly validateAssessmentAttempt: ValidateAssessmentAttemptUseCase,
   ) {}
 
-  async execute(data: CreateSubmissionData): Promise<Submission> {
+  async execute(data: CreateSubmissionData, userId: string): Promise<Submission> {
     const question = await this.questionRepository.findById(data.questionId);
 
     if (!question) {
@@ -45,6 +46,7 @@ export class CreateSubmissionUseCase {
     const reservedSlot = await this.validateAssessmentAttempt.reserveSubmissionSlot(
       data.assessmentAttemptId,
       question.assessmentId,
+      userId,
       MAX_SUBMISSIONS_PER_ATTEMPT,
     );
     if (!reservedSlot) {
@@ -52,6 +54,15 @@ export class CreateSubmissionUseCase {
     }
 
     try {
+      if (
+        await this.submissionRepository.hasEvaluatedSubmissionForQuestion(
+          data.assessmentAttemptId,
+          question.id,
+        )
+      ) {
+        throw new QuestionAlreadySubmittedError(question.id);
+      }
+
       return await this.submissionRepository.create(data);
     } catch (error: unknown) {
       await this.validateAssessmentAttempt.releaseSubmissionSlot(data.assessmentAttemptId);

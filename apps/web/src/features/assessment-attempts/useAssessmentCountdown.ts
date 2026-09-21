@@ -12,7 +12,7 @@ export function useAssessmentCountdown(attempt: AssessmentAttempt | null) {
     const update = () => setRemainingMs(getRemainingMs(attempt, serverOffsetMs));
     update();
 
-    if (!attempt || attempt.status === 'EXPIRED') return;
+    if (!attempt || attempt.status !== 'ACTIVE') return;
 
     const interval = window.setInterval(update, 1_000);
     return () => window.clearInterval(interval);
@@ -20,13 +20,14 @@ export function useAssessmentCountdown(attempt: AssessmentAttempt | null) {
 
   return {
     isExpired: attempt?.status === 'EXPIRED' || remainingMs <= 0,
+    isCompleted: attempt?.status === 'COMPLETED',
     remainingMs,
     label: formatRemainingTime(remainingMs),
   };
 }
 
 function getRemainingMs(attempt: AssessmentAttempt | null, serverOffsetMs: number) {
-  if (!attempt || attempt.status === 'EXPIRED') return 0;
+  if (!attempt || attempt.status !== 'ACTIVE') return 0;
   return Math.max(0, new Date(attempt.expiresAt).getTime() - (Date.now() + serverOffsetMs));
 }
 

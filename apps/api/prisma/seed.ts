@@ -1,6 +1,8 @@
 import { config } from 'dotenv';
+import bcrypt from 'bcryptjs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { supplementalDemoAssessments, type DemoAssessment } from '../src/scripts/supplemental-demo-assessments.js';
 
 config({ path: '../../.env' });
 
@@ -8,10 +10,9 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
 });
 
-type Language = 'JAVA' | 'JAVASCRIPT' | 'PYTHON';
+type Language = 'JAVA' | 'JAVASCRIPT' | 'PYTHON' | 'TYPESCRIPT' | 'COBOL';
 type TestCase = { input: string; expectedOutput: string; isHidden: boolean };
 type Question = {
-  slug: string;
   title: string;
   description: string;
   score: number;
@@ -19,21 +20,13 @@ type Question = {
   testCases: TestCase[];
 };
 
-const assessments: Array<{
-  slug: string;
-  name: string;
-  description: string;
-  durationMinutes: number;
-  questions: Question[];
-}> = [
+const assessments: DemoAssessment[] = [
   {
-    slug: 'algoritmos-esenciales',
     name: 'Algoritmos esenciales',
     description: 'Evalúa razonamiento básico, recorridos lineales y manipulación segura de texto.',
     durationMinutes: 45,
     questions: [
       {
-        slug: 'valor-maximo',
         title: 'Valor máximo de un arreglo',
         description: 'Lee n y luego n enteros separados por espacios. Imprime el valor más grande.',
         score: 50,
@@ -45,7 +38,6 @@ const assessments: Array<{
         ],
       },
       {
-        slug: 'anagrama',
         title: 'Detector de anagramas',
         description: 'Lee dos palabras en minúsculas. Imprime true si contienen las mismas letras con la misma frecuencia; de lo contrario, imprime false.',
         score: 50,
@@ -59,13 +51,11 @@ const assessments: Array<{
     ],
   },
   {
-    slug: 'colecciones-y-validacion',
     name: 'Colecciones y validación',
     description: 'Reto orientado a estructuras de datos, secuencias y validación de entradas.',
     durationMinutes: 50,
     questions: [
       {
-        slug: 'parentesis-balanceados',
         title: 'Paréntesis balanceados',
         description: 'Lee una cadena formada únicamente por ( y ). Imprime true si todos los paréntesis están correctamente balanceados; de lo contrario, imprime false.',
         score: 50,
@@ -77,7 +67,6 @@ const assessments: Array<{
         ],
       },
       {
-        slug: 'numeros-unicos-ordenados',
         title: 'Números únicos ordenados',
         description: 'Lee n y luego n enteros. Elimina duplicados, ordena de menor a mayor e imprime los valores separados por un espacio.',
         score: 50,
@@ -91,13 +80,11 @@ const assessments: Array<{
     ],
   },
   {
-    slug: 'transformacion-de-datos',
     name: 'Transformación de datos',
     description: 'Ejercicios de resolución práctica para transformar colecciones y buscar resultados.',
     durationMinutes: 55,
     questions: [
       {
-        slug: 'two-sum-indices',
         title: 'Índices de una suma objetivo',
         description: 'Lee n, un objetivo y luego n enteros. Imprime los primeros dos índices distintos cuya suma sea el objetivo, en orden ascendente. Si no existen, imprime -1 -1.',
         score: 50,
@@ -109,7 +96,6 @@ const assessments: Array<{
         ],
       },
       {
-        slug: 'suma-acumulada',
         title: 'Suma acumulada',
         description: 'Lee n y luego n enteros. Imprime una nueva secuencia donde cada posición contiene la suma de todos los valores hasta esa posición.',
         score: 50,
@@ -122,6 +108,7 @@ const assessments: Array<{
       },
     ],
   },
+  ...supplementalDemoAssessments,
 ];
 
 async function clearDemoData() {
@@ -129,19 +116,18 @@ async function clearDemoData() {
     prisma.testResult.deleteMany(),
     prisma.submission.deleteMany(),
     prisma.assessmentAttempt.deleteMany(),
-    prisma.assessmentResult.deleteMany(),
+    prisma.assessmentAssignment.deleteMany(),
     prisma.questionAllowedLanguage.deleteMany(),
     prisma.testCase.deleteMany(),
     prisma.question.deleteMany(),
     prisma.assessment.deleteMany(),
-    prisma.candidate.deleteMany(),
+    prisma.user.deleteMany(),
   ]);
 }
 
 async function createAssessment(input: (typeof assessments)[number]) {
   const assessment = await prisma.assessment.create({
     data: {
-      slug: input.slug,
       name: input.name,
       description: input.description,
       durationMinutes: input.durationMinutes,
@@ -154,7 +140,6 @@ async function createAssessment(input: (typeof assessments)[number]) {
     await prisma.question.create({
       data: {
         assessmentId: assessment.id,
-        slug: question.slug,
         title: question.title,
         description: question.description,
         position: index + 1,
@@ -169,22 +154,48 @@ async function createAssessment(input: (typeof assessments)[number]) {
       },
     });
   }
+
+  return assessment;
 }
 
 async function main() {
   await clearDemoData();
-  for (const assessment of assessments) {
-    await createAssessment(assessment);
-  }
-  await prisma.candidate.create({
+  const createdAssessments = await Promise.all(assessments.map(createAssessment));
+
+  const passwordHash = await bcrypt.hash('admin123', 12);
+  await prisma.user.create({
     data: {
-      identification: 'CANDIDATE-DEMO-001',
-      displayName: 'Camila Torres',
-      email: 'camila.torres@example.test',
+      email: 'admin@admin.com',
+      displayName: 'Administrador',
+      passwordHash,
+      role: 'ADMIN',
     },
   });
 
-  console.log(`Seed completed with ${assessments.length} realistic assessments.`);
+  const candidate = await prisma.user.create({
+    data: {
+      email: 'camila.torres@example.test',
+      displayName: 'Camila Torres',
+      passwordHash,
+      role: 'CANDIDATE',
+    },
+  });
+
+  const availableFrom = new Date();
+  availableFrom.setDate(availableFrom.getDate() - 1);
+  const availableUntil = new Date();
+  availableUntil.setDate(availableUntil.getDate() + 14);
+
+  await prisma.assessmentAssignment.createMany({
+    data: createdAssessments.slice(0, 2).map((assessment) => ({
+      userId: candidate.id,
+      assessmentId: assessment.id,
+      availableFrom,
+      availableUntil,
+    })),
+  });
+
+  console.log(`Seed completed with ${assessments.length} realistic assessments, local admin access and candidate assignments.`);
 }
 
 main()

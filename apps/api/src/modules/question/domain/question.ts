@@ -19,7 +19,6 @@ export type QuestionTestCase = {
 export type Question = {
   id: string;
   assessmentId: string;
-  slug: string;
   title: string;
   description: string;
   position: number;
@@ -39,3 +38,5 @@ export type CreateQuestionData = Omit<
     Pick<QuestionTestCase, 'position' | 'input' | 'expectedOutput' | 'isHidden'>
   >;
 };
+
+export type UpdateQuestionData = Omit<CreateQuestionData, 'assessmentId'>;

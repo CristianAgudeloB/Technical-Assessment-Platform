@@ -1,0 +1,30 @@
+direction: right
+
+candidate: Candidato { shape: person }
+admin: Administrador { shape: person }
+
+platform: Plataforma de Evaluaciones Tecnicas {
+  login: Registrarse e iniciar sesion
+  consult: Consultar evaluaciones asignadas
+  attempt: Iniciar o continuar intento temporizado
+  solve: Resolver pregunta en el editor
+  run: Ejecutar y enviar solucion
+  results: Consultar resultados del intento
+  manage: Crear y publicar evaluaciones
+  questions: Gestionar preguntas y casos de prueba
+  assign: Asignar evaluacion y ventana de disponibilidad
+  review: Consultar resultados de candidatos
+}
+
+candidate -> platform.login
+candidate -> platform.consult
+candidate -> platform.attempt
+candidate -> platform.solve
+candidate -> platform.run
+candidate -> platform.results
+
+admin -> platform.login
+admin -> platform.manage
+admin -> platform.questions
+admin -> platform.assign
+admin -> platform.review

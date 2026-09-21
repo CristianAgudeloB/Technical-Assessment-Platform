@@ -24,10 +24,27 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+export async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  return requestJson<T>(path, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export async function deleteJson(path: string): Promise<void> {
+  return requestJson<void>(path, { method: 'DELETE' });
+}
+
 async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  const token = getAccessToken();
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
-    headers: { Accept: 'application/json', ...init.headers },
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    },
   });
 
   if (!response.ok) {
@@ -41,5 +58,10 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     throw new ApiError(message, response.status);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
+import { getAccessToken } from './auth-token';

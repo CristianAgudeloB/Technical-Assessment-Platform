@@ -66,6 +66,18 @@ export class PrismaSubmissionRepository implements SubmissionRepository {
     return submissions.map((submission) => this.toDomain(submission));
   }
 
+  async hasEvaluatedSubmissionForQuestion(attemptId: string, questionId: string): Promise<boolean> {
+    const count = await this.prisma.submission.count({
+      where: {
+        assessmentAttemptId: attemptId,
+        questionId,
+        status: 'EVALUATED',
+      },
+    });
+
+    return count > 0;
+  }
+
   async markAsEvaluated(id: string, score: number): Promise<void> {
     await this.prisma.submission.update({
       where: { id },

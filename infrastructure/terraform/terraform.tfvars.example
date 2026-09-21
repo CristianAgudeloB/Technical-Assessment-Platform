@@ -1,0 +1,11 @@
+aws_region                 = "us-east-1"
+project_name               = "technical-assessment"
+environment                = "prod"
+initial_admin_email        = "admin@your-domain.com"
+initial_admin_display_name = "Administrador"
+
+# Use a unique, long value. This file must be copied to terraform.tfvars and kept out of Git.
+initial_admin_password = "replace-with-a-unique-strong-password"
+
+# Leave empty only while using Judge0 CE for a temporary demonstration.
+# judge0_auth_token = ""

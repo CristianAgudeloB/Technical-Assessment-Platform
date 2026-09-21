@@ -1,0 +1,24 @@
+direction: down
+
+start: Inicio { shape: circle }
+login: Iniciar sesion
+assigned: Consultar evaluaciones asignadas
+available: Evaluacion disponible { shape: diamond }
+startAttempt: Iniciar o recuperar intento
+solve: Resolver pregunta
+submit: Enviar solucion
+active: Intento activo { shape: diamond }
+results: Consultar resultado
+end: Fin { shape: circle }
+
+start -> login
+login -> assigned
+assigned -> available
+available -> startAttempt: si
+available -> end: no
+startAttempt -> solve
+solve -> submit
+submit -> active
+active -> solve: quedan preguntas y tiempo
+active -> results: finalizado o vencido
+results -> end

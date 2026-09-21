@@ -3,6 +3,13 @@ dist/
 coverage/
 .env
 *.log
+*.tsbuildinfo
+~$*.docx
 .DS_Store
 apps/api/src/generated/
 tmp/
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+crash.log

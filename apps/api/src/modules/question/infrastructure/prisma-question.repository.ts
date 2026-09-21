@@ -7,6 +7,7 @@ import {
   ProgrammingLanguage,
   Question,
   QuestionTestCase,
+  UpdateQuestionData,
 } from '../domain/question';
 import { QuestionRepository } from '../domain/question.repository';
 
@@ -19,7 +20,6 @@ export class PrismaQuestionRepository implements QuestionRepository {
       const question = await this.prisma.question.create({
         data: {
           assessmentId: data.assessmentId,
-          slug: data.slug,
           title: data.title,
           description: data.description,
           position: data.position,
@@ -37,7 +37,7 @@ export class PrismaQuestionRepository implements QuestionRepository {
       return this.toDomain(question);
     } catch (error: unknown) {
       if (this.isUniqueConstraintError(error)) {
-        throw new DuplicateEntityError('Question', 'slug or position within this assessment');
+        throw new DuplicateEntityError('Question', 'position within this assessment');
       }
 
       throw error;
@@ -53,6 +53,37 @@ export class PrismaQuestionRepository implements QuestionRepository {
     return question ? this.toDomain(question) : null;
   }
 
+  async update(id: string, data: UpdateQuestionData): Promise<Question> {
+    try {
+      const question = await this.prisma.question.update({
+        where: { id },
+        data: {
+          title: data.title,
+          description: data.description,
+          position: data.position,
+          score: data.score,
+          allowedLanguages: {
+            deleteMany: {},
+            create: data.allowedLanguages.map((language) => ({ language })),
+          },
+          testCases: {
+            deleteMany: {},
+            create: data.testCases,
+          },
+        },
+        include: this.questionDetails,
+      });
+
+      return this.toDomain(question);
+    } catch (error: unknown) {
+      if (this.isUniqueConstraintError(error)) {
+        throw new DuplicateEntityError('Question', 'position within this assessment');
+      }
+
+      throw error;
+    }
+  }
+
   async findByAssessmentId(assessmentId: string): Promise<Question[]> {
     const questions = await this.prisma.question.findMany({
       where: { assessmentId },
@@ -61,6 +92,10 @@ export class PrismaQuestionRepository implements QuestionRepository {
     });
 
     return questions.map((question) => this.toDomain(question));
+  }
+
+  async hasTestResults(id: string): Promise<boolean> {
+    return (await this.prisma.testResult.count({ where: { testCase: { questionId: id } } })) > 0;
   }
 
   private readonly questionDetails = {
@@ -82,7 +117,6 @@ export class PrismaQuestionRepository implements QuestionRepository {
     return {
       id: question.id,
       assessmentId: question.assessmentId,
-      slug: question.slug,
       title: question.title,
       description: question.description,
       position: question.position,

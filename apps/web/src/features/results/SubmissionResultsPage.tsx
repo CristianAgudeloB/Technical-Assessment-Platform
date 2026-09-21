@@ -36,6 +36,12 @@ function resultOutput(result: PersistedTestResult) {
   return result.compileOutput ?? result.stderr ?? result.stdout;
 }
 
+function compilationSummary(results: SubmissionResults) {
+  return results.testResults.some((result) => result.status === 'COMPILATION_ERROR')
+    ? 'Error de compilación'
+    : 'Compilación exitosa';
+}
+
 export function SubmissionResultsPage() {
   const { assessmentId, submissionId } = useParams();
   const [searchParams] = useSearchParams();
@@ -114,7 +120,7 @@ export function SubmissionResultsPage() {
         <div>
           <p className="section-kicker">Reporte de ejecución · Ejercicio {String(results.question.position).padStart(2, '0')}</p>
           <h1 id="results-title">Resultados</h1>
-          <p className="results-question">{results.question.title} · {formatLanguage(results.language)}</p>
+          <p className="results-question">{results.question.title} · {formatLanguage(results.language)} · {compilationSummary(results)}</p>
         </div>
         <div className="result-score" aria-label={`Puntaje ${results.score} por ciento`}>
           <span>Puntaje</span>
@@ -123,10 +129,10 @@ export function SubmissionResultsPage() {
       </header>
 
       <dl className="results-facts">
-        <div><dt>Tests exitosos</dt><dd>{results.passedTests}<span> / {results.totalTests}</span></dd></div>
-        <div><dt>Ejercicios correctos</dt><dd>{results.questionsCorrect}</dd></div>
-        <div><dt>Ejercicios incorrectos</dt><dd>{results.questionsIncorrect}</dd></div>
-        <div><dt>Tiempo consumido</dt><dd>{formatTime(results.timeConsumedMs)}<span> ejecución</span></dd></div>
+        <div><dt>Pruebas aprobadas</dt><dd>{results.passedTests}<span> / {results.totalTests}</span></dd></div>
+        <div><dt>Pruebas fallidas</dt><dd>{results.failedTests}</dd></div>
+        <div><dt>Compilación</dt><dd><span className={`compilation-state${compilationSummary(results) === 'Compilación exitosa' ? ' success' : ' error'}`}>{compilationSummary(results)}</span></dd></div>
+        <div><dt>Tiempo de ejecución</dt><dd>{formatTime(results.timeConsumedMs)}</dd></div>
       </dl>
 
       <section className="test-result-section" aria-labelledby="test-results-title">
@@ -135,11 +141,12 @@ export function SubmissionResultsPage() {
             <p className="section-kicker">Evaluación guardada</p>
             <h2 id="test-results-title">Resultados de pruebas</h2>
           </div>
-          <span>{results.failedTests === 0 ? 'Todas las pruebas fueron exitosas' : `${results.failedTests} prueba${results.failedTests === 1 ? '' : 's'} requiere atención`}</span>
+          <span>{results.passedTests} / {results.totalTests} pruebas aprobadas</span>
         </div>
         <ol className="test-result-list">
           {results.testResults.map((result) => {
             const output = resultOutput(result);
+            const isWrongAnswer = result.status === 'WRONG_ANSWER';
 
             return (
               <li className="test-result-row" key={result.id}>
@@ -152,7 +159,12 @@ export function SubmissionResultsPage() {
                   {result.executionTimeMs === null ? 'Sin datos de ejecución' : formatTime(result.executionTimeMs)}
                   {result.memoryKb === null ? '' : ` · ${result.memoryKb} KB`}
                 </span>
-                {output ? <pre className="test-result-output">{output}</pre> : null}
+                {isWrongAnswer && !result.isHidden ? (
+                  <div className="test-result-comparison">
+                    <div><span>Esperado</span><pre>{result.expectedOutput ?? '(sin valor esperado)'}</pre></div>
+                    <div><span>Recibido</span><pre>{result.stdout ?? '(sin salida)'}</pre></div>
+                  </div>
+                ) : output ? <pre className="test-result-output">{output}</pre> : null}
               </li>
             );
           })}

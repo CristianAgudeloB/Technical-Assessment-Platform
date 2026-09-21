@@ -1,0 +1,24 @@
+direction: down
+
+user: Usuario { shape: person }
+cloudfront: CloudFront
+s3: S3 privado {
+  spa: React compilado
+}
+ec2: EC2 publica {
+  nginx: Nginx
+  api: Contenedor NestJS
+}
+rds: RDS PostgreSQL privado
+judge: Judge0 externo
+ecr: Amazon ECR
+ssm: AWS Systems Manager
+
+user -> cloudfront: HTTPS
+cloudfront -> s3.spa: contenido estatico
+cloudfront -> ec2.nginx: ruta /api
+ec2.nginx -> ec2.api
+ec2.api -> rds: red privada
+ec2.api -> judge: HTTPS salida
+ecr -> ec2.api: imagen de despliegue
+ssm -> ec2: comando de despliegue

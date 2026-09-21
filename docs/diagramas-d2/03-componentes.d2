@@ -1,0 +1,40 @@
+direction: right
+
+browser: Navegador {
+  candidate: Portal del candidato React Vite
+  admin: Portal administrativo React Vite
+  editor: Monaco Editor
+}
+api: API NestJS Monolito Modular {
+  auth: Autenticacion JWT y roles
+  assignment: Asignaciones
+  assessment: Evaluaciones y preguntas
+  attempt: Intentos temporizados
+  submission: Submissions y resultados
+  evaluation: Estrategia de puntuacion
+  execution: Puerto de ejecucion
+}
+db: PostgreSQL {
+  prisma: Prisma repositories
+  data: Datos de dominio
+}
+judge: Judge0 externo {
+  sandbox: Compilacion y ejecucion aislada
+}
+
+browser.candidate -> api.auth: HTTPS JSON
+browser.candidate -> api.assessment: HTTPS JSON
+browser.candidate -> api.attempt: HTTPS JSON
+browser.candidate -> api.submission: HTTPS JSON
+browser.admin -> api.auth: HTTPS JSON
+browser.admin -> api.assignment: HTTPS JSON
+browser.admin -> api.assessment: HTTPS JSON
+api.auth -> db.prisma
+api.assignment -> db.prisma
+api.assessment -> db.prisma
+api.attempt -> db.prisma
+api.submission -> db.prisma
+api.submission -> api.evaluation
+api.submission -> api.execution
+api.execution -> judge.sandbox: adaptador CodeExecutionPort
+db.prisma -> db.data

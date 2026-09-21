@@ -47,7 +47,7 @@ export class GetAssessmentResultUseCase {
     private readonly submissionRepository: SubmissionRepository,
   ) {}
 
-  async execute(assessmentId: string, attemptId: string): Promise<AssessmentResultResponse> {
+  async execute(assessmentId: string, attemptId: string, userId: string): Promise<AssessmentResultResponse> {
     const initialAttempt = await this.attemptRepository.findById(attemptId);
 
     if (!initialAttempt) {
@@ -56,6 +56,10 @@ export class GetAssessmentResultUseCase {
 
     if (initialAttempt.assessmentId !== assessmentId) {
       throw new AssessmentAttemptNotForAssessmentError(attemptId, assessmentId);
+    }
+
+    if (initialAttempt.userId !== userId) {
+      throw new EntityNotFoundError('Assessment attempt', attemptId);
     }
 
     await this.attemptRepository.expireIfDue(initialAttempt.id, new Date());
@@ -67,13 +71,25 @@ export class GetAssessmentResultUseCase {
     const progress = calculateAssessmentProgress(questions, submissions);
     const timeConsumedSeconds = calculateTimeConsumedSeconds(attempt, submissions, progress.questionsPending);
 
-    await this.attemptRepository.updateSummary(attempt.id, {
+    const summary = {
       score: progress.score,
       completedQuestions: progress.completedQuestions,
       questionsCorrect: progress.questionsCorrect,
       questionsIncorrect: progress.questionsIncorrect,
       timeConsumedSeconds,
-    });
+    };
+    const completedNow =
+      attempt.status === AssessmentAttemptStatus.ACTIVE && progress.totalQuestions > 0 && progress.questionsPending === 0;
+
+    if (completedNow) {
+      await this.attemptRepository.complete(
+        attempt.id,
+        latestSubmissionAt(submissions) ?? attempt.updatedAt,
+        summary,
+      );
+    } else {
+      await this.attemptRepository.updateSummary(attempt.id, summary);
+    }
 
     return {
       assessmentId,
@@ -81,7 +97,9 @@ export class GetAssessmentResultUseCase {
       status:
         attempt.status === AssessmentAttemptStatus.EXPIRED
           ? 'EXPIRED'
-          : progress.questionsPending === 0
+          : attempt.status === AssessmentAttemptStatus.COMPLETED
+            ? 'COMPLETED'
+          : completedNow
             ? 'COMPLETED'
             : 'IN_PROGRESS',
       score: progress.score,
@@ -112,7 +130,13 @@ export class GetAssessmentResultUseCase {
 }
 
 function calculateTimeConsumedSeconds(
-  attempt: { startedAt: Date; expiresAt: Date; expiredAt: Date | null; status: AssessmentAttemptStatus },
+  attempt: {
+    startedAt: Date;
+    expiresAt: Date;
+    completedAt: Date | null;
+    expiredAt: Date | null;
+    status: AssessmentAttemptStatus;
+  },
   submissions: Array<{ submittedAt: Date | null }>,
   questionsPending: number,
 ): number {
@@ -124,6 +148,8 @@ function calculateTimeConsumedSeconds(
   const endedAt =
     attempt.status === AssessmentAttemptStatus.EXPIRED
       ? attempt.expiredAt ?? attempt.expiresAt
+      : attempt.status === AssessmentAttemptStatus.COMPLETED
+        ? attempt.completedAt ?? lastSubmissionAt ?? new Date()
       : questionsPending === 0 && lastSubmissionAt
         ? lastSubmissionAt
         : new Date();
@@ -131,5 +157,13 @@ function calculateTimeConsumedSeconds(
   return Math.max(
     0,
     Math.floor((Math.min(endedAt.getTime(), attempt.expiresAt.getTime()) - attempt.startedAt.getTime()) / 1_000),
+  );
+}
+
+function latestSubmissionAt(submissions: Array<{ submittedAt: Date | null }>): Date | null {
+  return submissions.reduce<Date | null>(
+    (latest, submission) =>
+      !submission.submittedAt || (latest && latest >= submission.submittedAt) ? latest : submission.submittedAt,
+    null,
   );
 }

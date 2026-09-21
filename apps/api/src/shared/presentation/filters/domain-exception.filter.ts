@@ -13,12 +13,18 @@ import {
   NoTestCasesConfiguredError,
   SubmissionResultsNotAvailableError,
   AssessmentAttemptExpiredError,
+  AssessmentAttemptCompletedError,
   AssessmentAttemptNotForAssessmentError,
   AssessmentNotEditableError,
+  QuestionNotEditableError,
   AssessmentNotReadyToPublishError,
   AssessmentNotPublishedError,
+  PreviewExecutionLimitExceededError,
+  QuestionAlreadySubmittedError,
   SubmissionNotExecutableError,
   SubmissionLimitExceededError,
+  AssignmentAvailabilityWindowError,
+  AssessmentAssignmentUnavailableError,
 } from '../../domain/errors/domain-errors';
 
 @Catch(
@@ -28,12 +34,18 @@ import {
   NoTestCasesConfiguredError,
   SubmissionResultsNotAvailableError,
   AssessmentAttemptExpiredError,
+  AssessmentAttemptCompletedError,
   AssessmentAttemptNotForAssessmentError,
   AssessmentNotEditableError,
+  QuestionNotEditableError,
   AssessmentNotReadyToPublishError,
   AssessmentNotPublishedError,
+  PreviewExecutionLimitExceededError,
+  QuestionAlreadySubmittedError,
   SubmissionNotExecutableError,
   SubmissionLimitExceededError,
+  AssignmentAvailabilityWindowError,
+  AssessmentAssignmentUnavailableError,
   ExecutionProviderError,
 )
 export class DomainExceptionFilter implements ExceptionFilter {
@@ -45,12 +57,18 @@ export class DomainExceptionFilter implements ExceptionFilter {
       | NoTestCasesConfiguredError
       | SubmissionResultsNotAvailableError
       | AssessmentAttemptExpiredError
+      | AssessmentAttemptCompletedError
       | AssessmentAttemptNotForAssessmentError
       | AssessmentNotEditableError
+      | QuestionNotEditableError
       | AssessmentNotReadyToPublishError
       | AssessmentNotPublishedError
+      | PreviewExecutionLimitExceededError
+      | QuestionAlreadySubmittedError
       | SubmissionNotExecutableError
       | SubmissionLimitExceededError
+      | AssignmentAvailabilityWindowError
+      | AssessmentAssignmentUnavailableError
       | ExecutionProviderError,
     host: ArgumentsHost,
   ) {
@@ -68,10 +86,18 @@ export class DomainExceptionFilter implements ExceptionFilter {
             ? HttpStatus.CONFLICT
           : exception instanceof AssessmentAttemptExpiredError
             ? HttpStatus.CONFLICT
+          : exception instanceof AssessmentAttemptCompletedError
+            ? HttpStatus.CONFLICT
+          : exception instanceof QuestionAlreadySubmittedError
+            ? HttpStatus.CONFLICT
           : exception instanceof SubmissionNotExecutableError
             ? HttpStatus.CONFLICT
           : exception instanceof SubmissionLimitExceededError
+          ? HttpStatus.TOO_MANY_REQUESTS
+          : exception instanceof PreviewExecutionLimitExceededError
             ? HttpStatus.TOO_MANY_REQUESTS
+          : exception instanceof AssessmentAssignmentUnavailableError
+            ? HttpStatus.FORBIDDEN
           : HttpStatus.UNPROCESSABLE_ENTITY;
 
     response.status(status).json({

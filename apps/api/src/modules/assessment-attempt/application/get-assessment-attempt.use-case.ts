@@ -13,10 +13,10 @@ export class GetAssessmentAttemptUseCase {
     private readonly attemptRepository: AssessmentAttemptRepository,
   ) {}
 
-  async execute(assessmentId: string, attemptId: string): Promise<AssessmentAttempt> {
+  async execute(assessmentId: string, attemptId: string, userId: string): Promise<AssessmentAttempt> {
     const attempt = await this.attemptRepository.findById(attemptId);
 
-    if (!attempt || attempt.assessmentId !== assessmentId) {
+    if (!attempt || attempt.assessmentId !== assessmentId || attempt.userId !== userId) {
       throw new EntityNotFoundError('Assessment attempt', attemptId);
     }
 

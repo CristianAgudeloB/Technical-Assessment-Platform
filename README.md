@@ -24,7 +24,7 @@ pnpm dev
 - API: http://localhost:3000/health
 - PostgreSQL: localhost:5432
 
-El seed crea tres assessments publicados, seis ejercicios realistas de programación, Java, JavaScript y Python, y 18 casos de prueba (incluyendo casos ocultos). La aplicación usa Judge0 mediante un adapter; el backend nunca ejecuta código de candidatos localmente.
+El seed crea tres assessments publicados, seis ejercicios realistas de programación, Java, JavaScript y Python, 18 casos de prueba (incluyendo casos ocultos) y el usuario administrador local. La aplicación usa Judge0 mediante un adapter; el backend nunca ejecuta código de candidatos localmente.
 
 ## Scripts
 
@@ -54,13 +54,30 @@ pnpm verify:execution # Valida ejecución, resultados persistidos y agregado por
 
 El resultado acumulado conserva el último resultado evaluado de cada pregunta. Su puntaje es el promedio ponderado por el puntaje configurado de cada pregunta; las preguntas no enviadas aportan cero.
 
-## Modo administrador de demostración
+## Acceso local
 
-El selector **Candidate / Administrator** del frontend permite recorrer los dos flujos de la demo. El administrador puede crear assessments, definir preguntas, lenguajes permitidos y hasta diez casos de prueba por pregunta. Es una simulación de interfaz: todavía no reemplaza autenticación ni autorización de servidor.
+La página inicial permite iniciar sesión o crear una cuenta. Todo registro público crea únicamente un usuario con rol `CANDIDATE`; las rutas de candidato y administrador se protegen también en el backend con JWT. Un candidato solo puede ver, abrir e iniciar los retos publicados que un administrador le haya asignado.
+
+El seed incluye este administrador para desarrollo local:
+
+```text
+Correo: admin@admin.com
+Contraseña: admin123
+```
+
+Estas credenciales no son aptas para un entorno real. Antes de desplegar, define un `JWT_SECRET` largo y aleatorio y crea la cuenta de administración con un mecanismo privado.
 
 ## API actual
 
 ```text
+POST /auth/register
+POST /auth/login
+GET  /auth/me
+
+GET  /assignments/candidates
+GET  /assignments/candidates/:candidateId
+POST /assignments
+
 POST /assessments
 GET  /assessments
 GET  /assessments/:id
@@ -84,6 +101,7 @@ Los endpoints validan payloads, límites, lenguajes permitidos y el tiempo del i
 - El código no confiable se envía únicamente a Judge0 a través de `CodeExecutionPort`.
 - Judge0 recibe límites de CPU, memoria, procesos, tamaño de archivo, red deshabilitada y timeout total de la operación.
 - Las submissions están limitadas a 30 000 caracteres y a 20 por intento.
+- Las sesiones son JWT de corta duración; las cuentas públicas son siempre candidatas y cada intento/submission se vincula al usuario autenticado.
 - `.env` está excluido del repositorio; `.env.example` contiene solo valores simulados.
 
-Autenticación/autorización y una instancia privada de Judge0 quedan fuera de alcance para esta Kata. Para AWS: el frontend puede desplegarse en S3/CloudFront, NestJS en Lambda/API Gateway y PostgreSQL en RDS; Judge0 permanece como proveedor aislado.
+Una instancia privada de Judge0 queda fuera del alcance actual. La configuración de producción disponible en [infrastructure/terraform/README.md](infrastructure/terraform/README.md) despliega React en S3/CloudFront y el modular monolith NestJS en una EC2 pequeña detrás de Nginx, con PostgreSQL en RDS privado. Esta alternativa evita el NAT Gateway que requeriría Lambda privada para comunicarse con Judge0 y mantiene el coste base más bajo para la Kata.

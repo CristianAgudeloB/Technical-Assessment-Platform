@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
-import { DuplicateEntityError } from '../../../shared/domain/errors/domain-errors';
 import { PrismaService } from '../../../shared/infrastructure/database/prisma.service';
 import {
   Assessment,
   AssessmentStatus,
   CreateAssessmentData,
+  UpdateAssessmentData,
 } from '../domain/assessment';
 import { AssessmentRepository } from '../domain/assessment.repository';
 
@@ -14,23 +14,15 @@ export class PrismaAssessmentRepository implements AssessmentRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateAssessmentData): Promise<Assessment> {
-    try {
-      const assessment = await this.prisma.assessment.create({
-        data: {
-          ...data,
-          status: AssessmentStatus.DRAFT,
-          publishedAt: null,
-        },
-      });
+    const assessment = await this.prisma.assessment.create({
+      data: {
+        ...data,
+        status: AssessmentStatus.DRAFT,
+        publishedAt: null,
+      },
+    });
 
-      return this.toDomain(assessment);
-    } catch (error: unknown) {
-      if (this.isUniqueConstraintError(error)) {
-        throw new DuplicateEntityError('Assessment', 'slug');
-      }
-
-      throw error;
-    }
+    return this.toDomain(assessment);
   }
 
   async publish(id: string): Promise<Assessment> {
@@ -45,12 +37,63 @@ export class PrismaAssessmentRepository implements AssessmentRepository {
     return this.toDomain(assessment);
   }
 
+  async update(id: string, data: UpdateAssessmentData): Promise<Assessment> {
+    const assessment = await this.prisma.assessment.update({
+      where: { id },
+      data,
+    });
+
+    return this.toDomain(assessment);
+  }
+
   async findAll(): Promise<Assessment[]> {
     const assessments = await this.prisma.assessment.findMany({
       orderBy: { createdAt: 'desc' },
     });
 
     return assessments.map((assessment) => this.toDomain(assessment));
+  }
+
+  async findPublished(): Promise<Assessment[]> {
+    const assessments = await this.prisma.assessment.findMany({
+      where: { status: AssessmentStatus.PUBLISHED },
+      orderBy: { publishedAt: 'desc' },
+    });
+
+    return assessments.map((assessment) => this.toDomain(assessment));
+  }
+
+  async findPublishedAssignedToUser(userId: string): Promise<Assessment[]> {
+    const now = new Date();
+    const assessments = await this.prisma.assessment.findMany({
+      where: {
+        status: AssessmentStatus.PUBLISHED,
+        assignments: {
+          some: {
+            userId,
+            availableFrom: { lte: now },
+            availableUntil: { gt: now },
+          },
+        },
+      },
+      include: {
+        assignments: {
+          where: {
+            userId,
+            availableFrom: { lte: now },
+            availableUntil: { gt: now },
+          },
+          select: { availableFrom: true, availableUntil: true },
+        },
+      },
+      orderBy: { publishedAt: 'desc' },
+    });
+
+    return assessments.map(({ assignments, ...assessment }) => ({
+      ...this.toDomain(assessment),
+      availableFrom: assignments[0]?.availableFrom,
+      availableUntil: assignments[0]?.availableUntil,
+    }));
   }
 
   async findById(id: string): Promise<Assessment | null> {
@@ -64,9 +107,5 @@ export class PrismaAssessmentRepository implements AssessmentRepository {
       ...assessment,
       status: assessment.status as AssessmentStatus,
     };
-  }
-
-  private isUniqueConstraintError(error: unknown): error is Prisma.PrismaClientKnownRequestError {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
   }
 }

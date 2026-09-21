@@ -10,7 +10,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -38,11 +37,6 @@ export class CreateTestCaseDto {
 }
 
 export class CreateQuestionDto {
-  @IsString()
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-  @MaxLength(100)
-  slug!: string;
-
   @IsString()
   @IsNotEmpty()
   @MaxLength(160)
